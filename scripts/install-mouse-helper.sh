@@ -21,4 +21,4 @@ cat > "$launch" <<PLIST
 PLIST
 plutil -lint "$launch"
 /bin/launchctl bootstrap "gui/$(id -u)" "$launch"
-echo 'Installed optional Logitech lifecycle helper.'
+echo 'Installed optional Logitech and SaneSideButtons lifecycle helper.'
