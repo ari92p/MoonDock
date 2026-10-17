@@ -44,9 +44,9 @@ An optional direct Desktop connection can be started with:
 
 The normal launch opens Moonlight's main window; no host names or credentials are embedded in the source.
 
-## Optional mouse helper
+## Optional Logitech helper
 
-`./scripts/install-mouse-helper.sh` installs a separate per-user helper that pauses Logi Options+ and SaneSideButtons while Moonlight is running and restores the tools it paused afterward. This can free mouse side buttons for streaming, but also pauses other Options+ features and SaneSideButtons navigation gestures for that duration. A manually restarted mouse tool is paused again even if the helper already has a pause marker. Install it only if that behavior is wanted. It does not read input. The existing legacy service name/path is retained to avoid duplicate helpers. The helper does not edit mouse-button mappings or third-party preferences. Other mouse tools are not managed.
+`./scripts/install-mouse-helper.sh` installs a separate per-user helper that pauses Logi Options+ while Moonlight is running and restarts it afterward. This can free mouse side buttons for streaming, but also pauses other Options+ features for that duration. Install it only if that behavior is wanted. It does not read input. The existing legacy service name/path is retained to avoid duplicate helpers. Third-party mouse-gesture tools may also need their own Moonlight exception; MoonDock does not edit their settings.
 
 ## Validation and limits
 
@@ -64,14 +64,6 @@ Streaming is identified from local process transport sockets and Moonlight's pro
 A prior WindowServer hang during display experimentation was not conclusively diagnosed. Display changes therefore take place only after the Moonlight process has exited, with a settling interval. These checks do not establish long-term stability.
 
 ## Change history
-
-### Mouse-helper maintenance
-
-Live checked: stopping the helper restores both previously paused mouse tools; starting it during Moonlight pauses both; a deliberately restarted Logitech service is paused again despite an existing marker. The Moonlight stream process stays unchanged throughout. The original input failure was reported while Logitech was already paused and SaneSideButtons was still running; stopping both removes those interception paths, but physical in-game side-button delivery after this repair has not yet been confirmed.
-
-- Pause SaneSideButtons as well as Logi Options+ while Moonlight is running, restoring only tools paused by this helper.
-- Recheck actual Logitech service state even when a pause marker exists, so an unexpected restart is caught.
-- This helper-only change does not replace the signed MoonDock application.
 
 ### 1.14.0
 
