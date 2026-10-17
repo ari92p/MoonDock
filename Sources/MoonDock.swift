@@ -10,6 +10,31 @@ let resolutionNotification = Notification.Name("de.mlemors.Moonlight4K.resolutio
 let mainWindowNotification = Notification.Name("de.mlemors.Moonlight4K.mainWindow")
 let permissionNotification = Notification.Name("de.mlemors.Moonlight4K.requestShortcutPermission")
 
+func makeMenuIcon() -> NSImage {
+    let image = NSImage(size: NSSize(width: 20, height: 18), flipped: false) { _ in
+        NSColor.black.setStroke()
+        NSColor.black.setFill()
+        let frame = NSBezierPath(roundedRect: NSRect(x: 1, y: 2, width: 18, height: 14),
+                                 xRadius: 2.2, yRadius: 2.2)
+        frame.lineWidth = 1.6
+        frame.stroke()
+
+        // Crescent inside the screen. Clip the cutout to the outer disk so
+        // the icon remains a clean alpha template in both menu-bar appearances.
+        NSGraphicsContext.saveGraphicsState()
+        let crescent = NSBezierPath(ovalIn: NSRect(x: 5.6, y: 4.6, width: 8.8, height: 8.8))
+        crescent.addClip()
+        crescent.append(NSBezierPath(ovalIn: NSRect(x: 8.1, y: 7.0, width: 8.35, height: 8.35)))
+        crescent.windingRule = .evenOdd
+        crescent.fill()
+        NSGraphicsContext.restoreGraphicsState()
+        return true
+    }
+    image.isTemplate = true
+    image.accessibilityDescription = "MoonDock"
+    return image
+}
+
 func runningMoonlight() -> [NSRunningApplication] {
     NSRunningApplication.runningApplications(withBundleIdentifier: moonlightID).filter { !$0.isTerminated }
 }
@@ -248,8 +273,12 @@ final class Launcher: NSObject, NSApplicationDelegate, NSMenuDelegate {
             message("MoonDock konnte nicht starten", error.localizedDescription)
             NSApp.terminate(nil); return
         }
-        item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-        item?.button?.title = "MoonDock"
+        item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
+        item?.button?.title = ""
+        item?.button?.image = makeMenuIcon()
+        item?.button?.imagePosition = .imageOnly
+        item?.button?.imageScaling = .scaleProportionallyDown
+        item?.button?.setAccessibilityLabel("MoonDock")
         item?.button?.toolTip = "MoonDock – manuelle Auflösungswahl wird beim Beenden zurückgesetzt"
         let menu = NSMenu()
         let settings = NSMenuItem(title: "Hauptfenster öffnen", action: #selector(showMainWindow), keyEquivalent: "")

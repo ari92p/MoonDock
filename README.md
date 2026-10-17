@@ -4,6 +4,8 @@ A macOS menu-bar companion for [Moonlight](https://github.com/moonlight-stream/m
 
 ## Menu
 
+The menu bar uses a compact monochrome rectangle-and-crescent icon, without a monitor stand or a text label. macOS adapts its template tint to light/dark menu bars; the tooltip and accessibility label remain MoonDock.
+
 - **Hauptfenster öffnen** raises an existing main window, including a hidden window. It only disconnects/reopens the local client when a stream is active. With Accessibility permission, minimized windows are restored as well.
 - **Mac-Auflösung** lists Standard (2560 × 1440 HiDPI), native 3840 × 2160, and supported HiDPI modes at 120 Hz. The current mode is checked. Standard is the preferred working scale for this setup, not a universal macOS factory default.
 - **Moonlight beenden** closes Moonlight and MoonDock.
@@ -61,6 +63,11 @@ Streaming is identified from local process transport sockets and Moonlight's pro
 A prior WindowServer hang during display experimentation was not conclusively diagnosed. Display changes therefore take place only after the Moonlight process has exited, with a settling interval. These checks do not establish long-term stability.
 
 ## Change history
+
+### 1.12.0
+
+- Replace the menu-bar text with the selected rectangle-and-crescent symbol, without a monitor stand.
+- Draw it as a resolution-independent template image and retain the MoonDock accessibility label.
 
 ### 1.11.0
 
