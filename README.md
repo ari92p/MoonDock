@@ -6,15 +6,15 @@ A macOS menu-bar companion for [Moonlight](https://github.com/moonlight-stream/m
 
 The menu bar uses a compact monochrome rectangle-and-crescent icon, without a monitor stand or a text label. macOS adapts its template tint to light/dark menu bars; the tooltip and accessibility label remain MoonDock.
 
-- **Hauptfenster öffnen** raises an existing main window, including a hidden window. It only disconnects/reopens the local client when a stream is active. With Accessibility permission, minimized windows are restored as well.
+- **Moonlight öffnen** raises an existing main window, including a hidden window. It only disconnects/reopens the local client when a stream is active. With Accessibility permission, minimized windows are restored as well.
 - **Mac-Auflösung** lists Standard (2560 × 1440 HiDPI), native 3840 × 2160, and supported HiDPI modes at 120 Hz. The current mode is checked. Standard is the preferred working scale for this setup, not a universal macOS factory default.
-- **Moonlight beenden** closes Moonlight and MoonDock.
+- **Moonlight beenden** closes Moonlight and MoonDock. Closing Moonlight itself, including the window close button or Command-Q, leaves MoonDock in the menu bar so **Moonlight öffnen** can reopen it.
 
-Starting MoonDock does not change the display mode. A manual mode selection ends the local Moonlight process before switching, then opens its main window. If a display mode was changed in MoonDock, fully quitting restores the mode from startup. Otherwise quitting leaves the display alone. Temporary changes are also reverted by macOS if MoonDock crashes. Windows applications are not intentionally terminated.
+Starting MoonDock does not change the display mode. A manual mode selection ends the local Moonlight process before switching, then opens its main window. If a display mode was changed in MoonDock, explicitly quitting via **Moonlight beenden** restores the mode from startup. Closing Moonlight alone keeps the selected display mode while MoonDock remains running. Without a manual change, display settings are left alone. Temporary changes are also reverted by macOS if MoonDock crashes. Windows applications are not intentionally terminated.
 
 Option–Command–Tab hides Moonlight and returns to the previous Mac app. This requires **System Settings → Privacy & Security → Accessibility → MoonDock**. The legacy bundle identifier is retained for compatibility with previous Moonlight 4K installations. Ad-hoc signed updates may require toggling this permission off and on. No input history is recorded.
 
-MoonDock reacts directly to macOS's Moonlight-process termination event, including normal Quit/Command-Q, without the old extra two-second delay. A polling fallback handles missed events. Intentional stream/main-window and display-mode transitions keep MoonDock running.
+MoonDock stays in the menu bar when Moonlight exits or its window is closed. Only the companion's **Moonlight beenden** action ends both apps and restores a manually changed display mode. That explicit stop still reacts directly to process termination without the old extra two-second delay. Intentional stream/main-window and display-mode transitions also keep MoonDock running.
 
 ## Requirements
 
@@ -63,6 +63,14 @@ Streaming is identified from local process transport sockets and Moonlight's pro
 A prior WindowServer hang during display experimentation was not conclusively diagnosed. Display changes therefore take place only after the Moonlight process has exited, with a settling interval. These checks do not establish long-term stability.
 
 ## Change history
+
+### 1.13.0
+
+Live checked: closing Moonlight leaves the same MoonDock process and the selected display mode intact; the menu reopens Moonlight; explicitly exiting MoonDock while Moonlight is already closed restores the original display mode and quits the companion.
+
+- Keep MoonDock running after Moonlight closes, including Command-Q and window-close exits.
+- Reopen Moonlight from the menu, now labeled **Moonlight öffnen**.
+- Restore manual display changes only when explicitly exiting MoonDock; keep the no-delay stop behavior.
 
 ### 1.12.1
 

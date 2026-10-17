@@ -230,7 +230,6 @@ final class Launcher: NSObject, NSApplicationDelegate, NSMenuDelegate {
     var initialMode: CGDisplayMode?
     var didChangeResolution = false
     var displayUUID: CFUUID?
-    var sawMoonlight = false
     var finishing = false
     var stopping = false
     var launching = false
@@ -247,7 +246,6 @@ final class Launcher: NSObject, NSApplicationDelegate, NSMenuDelegate {
     var moonlightFocused = false
     var swallowTabUp = false
     var nextPermissionCheck = Date.distantPast
-    let started = Date()
 
     func message(_ title: String, _ text: String) {
         NSApp.activate(ignoringOtherApps: true)
@@ -281,7 +279,7 @@ final class Launcher: NSObject, NSApplicationDelegate, NSMenuDelegate {
         item?.button?.setAccessibilityLabel("MoonDock")
         item?.button?.toolTip = "MoonDock – manuelle Auflösungswahl wird beim Beenden zurückgesetzt"
         let menu = NSMenu()
-        let settings = NSMenuItem(title: "Hauptfenster öffnen", action: #selector(showMainWindow), keyEquivalent: "")
+        let settings = NSMenuItem(title: "Moonlight öffnen", action: #selector(showMainWindow), keyEquivalent: "")
         settings.target = self; menu.addItem(settings)
         let resolutions = NSMenuItem(title: "Mac-Auflösung", action: nil, keyEquivalent: "")
         let choicesMenu = NSMenu(title: "Mac-Auflösung")
@@ -341,7 +339,7 @@ final class Launcher: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 catch {
                     self.launching = false
                     self.message("Moonlight konnte nicht geöffnet werden", error.localizedDescription)
-                    self.finish()
+
                 }
                 return
             }
@@ -354,8 +352,8 @@ final class Launcher: NSObject, NSApplicationDelegate, NSMenuDelegate {
                     self.launching = false
                     if let error = error {
                         self.message("Moonlight konnte nicht geöffnet werden", error.localizedDescription)
-                        self.finish()
-                    } else if app != nil { self.sawMoonlight = true }
+
+                    }
                 }
             }
         }
@@ -569,7 +567,7 @@ final class Launcher: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 }
                 if let error = error {
                     self.message("Moonlight-Hauptfenster", error.localizedDescription)
-                    self.finish()
+
                 } else if let app = app {
                     _ = app.unhide()
                     app.activate(options: [.activateAllWindows])
@@ -584,7 +582,6 @@ final class Launcher: NSObject, NSApplicationDelegate, NSMenuDelegate {
                             }
                         }
                     }
-                    self.sawMoonlight = true
                     UserDefaults.standard.set(true, forKey: "mainWindowOpened")
                 }
             }
@@ -609,12 +606,12 @@ final class Launcher: NSObject, NSApplicationDelegate, NSMenuDelegate {
     @objc func moonlightTerminated(_ notification: Notification) {
         guard let app = notification.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication,
               app.bundleIdentifier == moonlightID else { return }
-        // Workspace has confirmed process termination, so no extra grace period
-        // is needed. An intentional main-window/resolution transition stays alive.
+        // Closing Moonlight leaves MoonDock available for reopening it.
+        // Only an explicit stop request closes this menu-bar companion.
         DispatchQueue.main.async { [weak self] in
             guard let self = self, !self.finishing else { return }
             if self.returningToMain { self.check(); return }
-            if !self.launching && !self.mainWindowOpening && runningMoonlight().isEmpty { self.finish() }
+            if self.stopping && !self.launching && !self.mainWindowOpening && runningMoonlight().isEmpty { self.finish() }
         }
     }
 
@@ -631,12 +628,8 @@ final class Launcher: NSObject, NSApplicationDelegate, NSMenuDelegate {
             }
             return
         }
-        if !runningMoonlight().isEmpty {
-            sawMoonlight = true
-        } else if sawMoonlight && !launching && !mainWindowOpening {
+        if stopping && !launching && !mainWindowOpening && runningMoonlight().isEmpty {
             // Fallback for a missed workspace event, without an additional delay.
-            finish()
-        } else if !launching && Date().timeIntervalSince(started) > 20 {
             finish()
         }
     }
