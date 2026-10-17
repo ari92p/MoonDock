@@ -64,6 +64,11 @@ A prior WindowServer hang during display experimentation was not conclusively di
 
 ## Change history
 
+### 1.12.1
+
+- Add the matching rectangle-and-crescent application icon for Finder and Dock, without a monitor stand.
+- Generate the complete Retina ICNS icon set from vector artwork during the build.
+
 ### 1.12.0
 
 - Replace the menu-bar text with the selected rectangle-and-crescent symbol, without a monitor stand.

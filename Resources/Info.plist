@@ -6,6 +6,8 @@
 	<string>MoonDock</string>
 	<key>CFBundleExecutable</key>
 	<string>MoonDock</string>
+	<key>CFBundleIconFile</key>
+	<string>MoonDock.icns</string>
 	<key>CFBundleIdentifier</key>
 	<string>de.mlemors.Moonlight4K</string>
 	<key>CFBundleName</key>
@@ -13,9 +15,9 @@
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
-	<string>1.12.0</string>
+	<string>1.12.1</string>
 	<key>CFBundleVersion</key>
-	<string>13</string>
+	<string>14</string>
 	<key>LSMinimumSystemVersion</key>
 	<string>13.0</string>
 	<key>LSUIElement</key>
