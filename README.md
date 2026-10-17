@@ -44,13 +44,9 @@ An optional direct Desktop connection can be started with:
 
 The normal launch opens Moonlight's main window; no host names or credentials are embedded in the source.
 
-## Logitech side buttons
+## Optional Logitech helper
 
-For the Signature M750 setup, `scripts/configure-logitech-side-buttons.py` changes only the two side-button assignments in the Moonlight app profile. F13/F14 are reserved there as transport keys; MoonDock converts their press/release events into native mouse buttons 4/5 and posts those mouse events only to the focused Moonlight process. Other apps and scrolling are not remapped. Held buttons are released when focus leaves Moonlight.
-
-Logi Options+ stays running. Whole-program suspension is no longer recommended after an input regression in the earlier setup. Unload/remove the old `de.mlemors.MoonlightMouseBridge` LaunchAgent when migrating. SaneSideButtons may keep its existing Moonlight exception and does not need to be paused. The old suspension scripts have been removed from the current source; their earlier versions remain in Git history for rollback.
-
-The bridge uses the same Accessibility permission as Option–Command–Tab. After an ad-hoc signed update, enable MoonDock again in macOS Accessibility. Until permission is granted, the reserved keys cannot be translated. No typed text or input history is stored. The configuration tool transactionally edits the local Logi database while its agent is stopped; it does not print or copy the full database. Other assignments remain unchanged. It is specific to the tested Signature M750 slots.
+`./scripts/install-mouse-helper.sh` installs a separate per-user helper that pauses Logi Options+ while Moonlight is running and restarts it afterward. This can free mouse side buttons for streaming, but also pauses other Options+ features for that duration. Install it only if that behavior is wanted. It does not read input. The existing legacy service name/path is retained to avoid duplicate helpers. Third-party mouse-gesture tools may also need their own Moonlight exception; MoonDock does not edit their settings.
 
 ## Validation and limits
 
@@ -68,15 +64,6 @@ Streaming is identified from local process transport sockets and Moonlight's pro
 A prior WindowServer hang during display experimentation was not conclusively diagnosed. Display changes therefore take place only after the Moonlight process has exited, with a settling interval. These checks do not establish long-term stability.
 
 ## Change history
-
-### 1.15.0
-
-Checked locally: native mouse-4/5 press/release events carry the expected button indices, preserve modifier flags and leave unrelated keys/scroll events unhandled. The Moonlight-specific Logitech assignments were read back as F13/F14; the legacy pause agent is disabled and both normal mouse tools are running. The installed event tap is still awaiting renewed macOS Accessibility approval, so physical end-to-end in-game input is not yet verified.
-
-- Replace whole-program suspension with Moonlight-only side-button translation.
-- Preserve normal Logitech scrolling and app-specific mouse behavior elsewhere.
-- Release forwarded held buttons when Moonlight loses focus.
-- Physical end-to-end delivery remains pending after macOS Accessibility approval; local event-construction checks do not prove in-game input.
 
 ### 1.14.0
 

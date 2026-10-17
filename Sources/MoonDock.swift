@@ -36,23 +36,6 @@ func makeMenuIcon() -> NSImage {
     return image
 }
 
-func sideButtonMouseEvent(keyCode: Int64, type: CGEventType, location: CGPoint, flags: CGEventFlags) -> CGEvent? {
-    let buttonNumber: Int64
-    switch keyCode {
-    case Int64(kVK_F13): buttonNumber = 3
-    case Int64(kVK_F14): buttonNumber = 4
-    default: return nil
-    }
-    guard type == .keyDown || type == .keyUp else { return nil }
-    let mouseType: CGEventType = type == .keyDown ? .otherMouseDown : .otherMouseUp
-    guard let event = CGEvent(mouseEventSource: nil, mouseType: mouseType,
-        mouseCursorPosition: location, mouseButton: CGMouseButton(rawValue: UInt32(buttonNumber))!) else { return nil }
-    event.setIntegerValueField(.mouseEventButtonNumber, value: buttonNumber)
-    event.setIntegerValueField(.mouseEventClickState, value: 1)
-    event.flags = flags
-    return event
-}
-
 func runningMoonlight() -> [NSRunningApplication] {
     NSRunningApplication.runningApplications(withBundleIdentifier: moonlightID).filter { !$0.isTerminated }
 }
@@ -269,8 +252,6 @@ final class Launcher: NSObject, NSApplicationDelegate, NSMenuDelegate {
     var shortcutTap: CFMachPort?
     var shortcutTapSource: CFRunLoopSource?
     var moonlightFocused = false
-    var focusedMoonlightPID: pid_t?
-    var heldSideButtonKeys: [Int64: pid_t] = [:]
     var swallowTabUp = false
     var nextPermissionCheck = Date.distantPast
 
@@ -361,9 +342,7 @@ final class Launcher: NSObject, NSApplicationDelegate, NSMenuDelegate {
             name: NSWorkspace.didTerminateApplicationNotification, object: nil)
         NSWorkspace.shared.notificationCenter.addObserver(self, selector: #selector(activeAppChanged(_:)),
             name: NSWorkspace.didActivateApplicationNotification, object: nil)
-        let frontmost = NSWorkspace.shared.frontmostApplication
-        moonlightFocused = frontmost?.bundleIdentifier == moonlightID
-        focusedMoonlightPID = moonlightFocused ? frontmost?.processIdentifier : nil
+        moonlightFocused = NSWorkspace.shared.frontmostApplication?.bundleIdentifier == moonlightID
         registerReturnShortcut()
         installShortcutFilter()
         timer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in self?.check() }
@@ -441,35 +420,8 @@ final class Launcher: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
     }
 
-    func releaseSideButtons() {
-        let location = CGEvent(source: nil)?.location ?? .zero
-        for (key, pid) in heldSideButtonKeys {
-            sideButtonMouseEvent(keyCode: key, type: .keyUp, location: location, flags: [])?.postToPid(pid)
-        }
-        heldSideButtonKeys.removeAll()
-    }
-
-    func forwardSideButton(_ event: CGEvent, type: CGEventType, key: Int64) -> Bool {
-        if type == .keyUp, let pid = heldSideButtonKeys.removeValue(forKey: key) {
-            sideButtonMouseEvent(keyCode: key, type: type, location: event.location, flags: event.flags)?.postToPid(pid)
-            return true
-        }
-        guard type == .keyDown, moonlightFocused, let pid = focusedMoonlightPID else { return false }
-        if event.getIntegerValueField(.keyboardEventAutorepeat) == 0 {
-            guard let mouse = sideButtonMouseEvent(keyCode: key, type: type, location: event.location, flags: event.flags) else { return false }
-            heldSideButtonKeys[key] = pid
-            // Target only Moonlight. Other mouse utilities keep normal scrolling.
-            mouse.postToPid(pid)
-        }
-        return true
-    }
-
     @objc func activeAppChanged(_ notification: Notification) {
-        let active = notification.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication
-        let isMoonlight = active?.bundleIdentifier == moonlightID
-        if !isMoonlight { releaseSideButtons() }
-        moonlightFocused = isMoonlight
-        focusedMoonlightPID = isMoonlight ? active?.processIdentifier : nil
+        moonlightFocused = (notification.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication)?.bundleIdentifier == moonlightID
     }
 
     @objc func requestShortcutPermission() {
@@ -490,13 +442,11 @@ final class Launcher: NSObject, NSApplicationDelegate, NSMenuDelegate {
                     if let tap = owner.shortcutTap { CGEvent.tapEnable(tap: tap, enable: true) }
                     return Unmanaged.passUnretained(event)
                 }
-                // Only Tab and the two reserved side-button keys are handled.
-                // No typed text or input history is retained.
-                let key = event.getIntegerValueField(.keyboardEventKeycode)
-                if key == Int64(kVK_F13) || key == Int64(kVK_F14) {
-                    return owner.forwardSideButton(event, type: type, key: key) ? nil : Unmanaged.passUnretained(event)
+                // Only inspect Tab and its modifier flags. No characters or input history
+                // are retained, logged, or forwarded by this helper.
+                guard event.getIntegerValueField(.keyboardEventKeycode) == Int64(kVK_Tab) else {
+                    return Unmanaged.passUnretained(event)
                 }
-                guard key == Int64(kVK_Tab) else { return Unmanaged.passUnretained(event) }
                 if type == .keyUp && owner.swallowTabUp {
                     owner.swallowTabUp = false
                     return nil
@@ -691,7 +641,6 @@ final class Launcher: NSObject, NSApplicationDelegate, NSMenuDelegate {
     @objc func stopMoonlight() {
         guard !stopping else { return }
         stopping = true
-        releaseSideButtons()
         returningToMain = false
         pendingResolutionKey = nil
         let apps = runningMoonlight()
