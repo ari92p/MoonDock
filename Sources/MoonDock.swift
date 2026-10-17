@@ -7,6 +7,7 @@ let moonlightID = "com.moonlight-stream.Moonlight"
 let stopNotification = Notification.Name("de.mlemors.Moonlight4K.stop")
 let returnNotification = Notification.Name("de.mlemors.Moonlight4K.return")
 let resolutionNotification = Notification.Name("de.mlemors.Moonlight4K.resolution")
+let endStreamNotification = Notification.Name("de.mlemors.Moonlight4K.endStream")
 let mainWindowNotification = Notification.Name("de.mlemors.Moonlight4K.mainWindow")
 let permissionNotification = Notification.Name("de.mlemors.Moonlight4K.requestShortcutPermission")
 
@@ -207,6 +208,11 @@ if CommandLine.arguments.contains("--moonlight-state") {
     }
     exit(0)
 }
+if CommandLine.arguments.contains("--end-stream") {
+    DistributedNotificationCenter.default().postNotificationName(endStreamNotification, object: nil,
+        userInfo: nil, deliverImmediately: true)
+    exit(0)
+}
 if CommandLine.arguments.contains("--main-window") {
     DistributedNotificationCenter.default().postNotificationName(mainWindowNotification, object: nil,
         userInfo: nil, deliverImmediately: true)
@@ -238,6 +244,8 @@ final class Launcher: NSObject, NSApplicationDelegate, NSMenuDelegate {
     var pendingResolutionKey: String?
     var resolutionApplying = false
     var resolutionMenu: NSMenu?
+    var openMenuItem: NSMenuItem?
+    var endStreamMenuItem: NSMenuItem?
     var returnHotKey: EventHotKeyRef?
     var returnEventHandler: EventHandlerRef?
     var previousMacApp: NSRunningApplication?
@@ -279,8 +287,18 @@ final class Launcher: NSObject, NSApplicationDelegate, NSMenuDelegate {
         item?.button?.setAccessibilityLabel("MoonDock")
         item?.button?.toolTip = "MoonDock – manuelle Auflösungswahl wird beim Beenden zurückgesetzt"
         let menu = NSMenu()
+        menu.autoenablesItems = false
+        menu.delegate = self
         let settings = NSMenuItem(title: "Moonlight öffnen", action: #selector(showMainWindow), keyEquivalent: "")
         settings.target = self; menu.addItem(settings)
+        openMenuItem = settings
+        let endStream = NSMenuItem(title: "Stream beenden", action: #selector(endCurrentStream), keyEquivalent: "")
+        endStream.target = self
+        endStream.isEnabled = false
+        endStream.toolTip = "Stream trennen und das Hauptfenster öffnen. MoonDock und die aktuelle Mac-Auflösung bleiben erhalten."
+        endStreamMenuItem = endStream
+        menu.addItem(endStream)
+        menu.addItem(.separator())
         let resolutions = NSMenuItem(title: "Mac-Auflösung", action: nil, keyEquivalent: "")
         let choicesMenu = NSMenu(title: "Mac-Auflösung")
         choicesMenu.autoenablesItems = false
@@ -303,8 +321,10 @@ final class Launcher: NSObject, NSApplicationDelegate, NSMenuDelegate {
         menu.addItem(resolutions)
         refreshResolutionMenu()
         menu.addItem(.separator())
-        let stop = NSMenuItem(title: "Moonlight beenden", action: #selector(stopMoonlight), keyEquivalent: "")
-        stop.target = self; menu.addItem(stop)
+        let stop = NSMenuItem(title: "MoonDock beenden", action: #selector(stopMoonlight), keyEquivalent: "")
+        stop.target = self
+        stop.toolTip = "Moonlight und MoonDock schließen und eine im Menü geänderte Mac-Auflösung zurückstellen."
+        menu.addItem(stop)
         item?.menu = menu
         DistributedNotificationCenter.default().addObserver(self, selector: #selector(stopMoonlight),
             name: stopNotification, object: nil)
@@ -316,6 +336,8 @@ final class Launcher: NSObject, NSApplicationDelegate, NSMenuDelegate {
             name: mainWindowNotification, object: nil)
         DistributedNotificationCenter.default().addObserver(self, selector: #selector(requestResolution(_:)),
             name: resolutionNotification, object: nil)
+        DistributedNotificationCenter.default().addObserver(self, selector: #selector(endCurrentStream),
+            name: endStreamNotification, object: nil)
         NSWorkspace.shared.notificationCenter.addObserver(self, selector: #selector(moonlightTerminated(_:)),
             name: NSWorkspace.didTerminateApplicationNotification, object: nil)
         NSWorkspace.shared.notificationCenter.addObserver(self, selector: #selector(activeAppChanged(_:)),
@@ -449,7 +471,18 @@ final class Launcher: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
     }
 
-    func menuWillOpen(_ menu: NSMenu) { refreshResolutionMenu() }
+    func menuWillOpen(_ menu: NSMenu) {
+        refreshResolutionMenu()
+        refreshWorkflowMenu()
+    }
+
+    func refreshWorkflowMenu() {
+        let streaming = runningMoonlight().contains(where: { moonlightIsStreaming($0) })
+        let available = !returningToMain && !stopping && !finishing && !launching
+        openMenuItem?.title = streaming ? "Stream anzeigen" : "Moonlight öffnen"
+        openMenuItem?.isEnabled = available
+        endStreamMenuItem?.isEnabled = available && streaming
+    }
 
     func refreshResolutionMenu() {
         guard let display = display, let current = CGDisplayCopyDisplayMode(display), let menu = resolutionMenu else { return }
@@ -479,7 +512,7 @@ final class Launcher: NSObject, NSApplicationDelegate, NSMenuDelegate {
         if sameMode(current, choice.mode) { refreshResolutionMenu(); return }
         pendingResolutionKey = key
         UserDefaults.standard.removeObject(forKey: "lastResolutionError")
-        showMainWindow()
+        prepareMainWindow()
         refreshResolutionMenu()
     }
 
@@ -521,6 +554,23 @@ final class Launcher: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     @objc func showMainWindow() {
+        guard !finishing, !stopping, !returningToMain else { return }
+        if let stream = runningMoonlight().first(where: { moonlightIsStreaming($0) }) {
+            // Opening/showing is non-destructive. Disconnecting has its own action.
+            _ = stream.unhide()
+            stream.activate(options: [.activateAllWindows])
+            return
+        }
+        prepareMainWindow()
+    }
+
+    @objc func endCurrentStream() {
+        guard !finishing, !stopping, !returningToMain,
+              runningMoonlight().contains(where: { moonlightIsStreaming($0) }) else { return }
+        prepareMainWindow()
+    }
+
+    func prepareMainWindow() {
         guard !finishing, !stopping, !returningToMain else { return }
         returningToMain = true
         UserDefaults.standard.set(false, forKey: "mainWindowOpened")

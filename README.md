@@ -6,15 +6,16 @@ A macOS menu-bar companion for [Moonlight](https://github.com/moonlight-stream/m
 
 The menu bar uses a compact monochrome rectangle-and-crescent icon, without a monitor stand or a text label. macOS adapts its template tint to light/dark menu bars; the tooltip and accessibility label remain MoonDock.
 
-- **Moonlight öffnen** raises an existing main window, including a hidden window. It only disconnects/reopens the local client when a stream is active. With Accessibility permission, minimized windows are restored as well.
-- **Mac-Auflösung** lists Standard (2560 × 1440 HiDPI), native 3840 × 2160, and supported HiDPI modes at 120 Hz. The current mode is checked. Standard is the preferred working scale for this setup, not a universal macOS factory default.
-- **Moonlight beenden** closes Moonlight and MoonDock. Closing Moonlight itself, including the window close button or Command-Q, leaves MoonDock in the menu bar so **Moonlight öffnen** can reopen it.
+- **Moonlight öffnen** opens or raises the main window when no stream is active. During a stream the same item reads **Stream anzeigen** and raises that live stream without disconnecting it.
+- **Stream beenden** is enabled only while streaming. It disconnects the local stream and opens Moonlight's main window, keeping MoonDock and the selected Mac display mode alive.
+- **Mac-Auflösung** lists Standard (2560 × 1440 HiDPI), native 3840 × 2160, and supported HiDPI modes at 120 Hz. The current mode is checked. Standard is the preferred working scale for this setup, not a universal macOS factory default. A mode change closes the local client before reconfiguring the display.
+- **MoonDock beenden** is the bottom item and closes Moonlight and MoonDock, restoring a display mode changed in the companion. Closing Moonlight itself, including the window close button or Command-Q, leaves MoonDock in the menu bar so it can reopen Moonlight.
 
-Starting MoonDock does not change the display mode. A manual mode selection ends the local Moonlight process before switching, then opens its main window. If a display mode was changed in MoonDock, explicitly quitting via **Moonlight beenden** restores the mode from startup. Closing Moonlight alone keeps the selected display mode while MoonDock remains running. Without a manual change, display settings are left alone. Temporary changes are also reverted by macOS if MoonDock crashes. Windows applications are not intentionally terminated.
+Starting MoonDock does not change the display mode. A manual mode selection ends the local Moonlight process before switching, then opens its main window. If a display mode was changed in MoonDock, explicitly quitting via **MoonDock beenden** restores the mode from startup. Closing Moonlight alone keeps the selected display mode while MoonDock remains running. Without a manual change, display settings are left alone. Temporary changes are also reverted by macOS if MoonDock crashes. Windows applications are not intentionally terminated.
 
 Option–Command–Tab hides Moonlight and returns to the previous Mac app. This requires **System Settings → Privacy & Security → Accessibility → MoonDock**. The legacy bundle identifier is retained for compatibility with previous Moonlight 4K installations. Ad-hoc signed updates may require toggling this permission off and on. No input history is recorded.
 
-MoonDock stays in the menu bar when Moonlight exits or its window is closed. Only the companion's **Moonlight beenden** action ends both apps and restores a manually changed display mode. That explicit stop still reacts directly to process termination without the old extra two-second delay. Intentional stream/main-window and display-mode transitions also keep MoonDock running.
+MoonDock stays in the menu bar when Moonlight exits or its window is closed. Only the companion's **MoonDock beenden** action ends both apps and restores a manually changed display mode. That explicit stop still reacts directly to process termination without the old extra two-second delay. Intentional stream/main-window and display-mode transitions also keep MoonDock running.
 
 ## Requirements
 
@@ -63,6 +64,14 @@ Streaming is identified from local process transport sockets and Moonlight's pro
 A prior WindowServer hang during display experimentation was not conclusively diagnosed. Display changes therefore take place only after the Moonlight process has exited, with a settling interval. These checks do not establish long-term stability.
 
 ## Change history
+
+### 1.14.0
+
+Live checked: showing an active stream preserves the same client process; ending it opens the main window without changing the display or MoonDock process; stopping with no stream is a no-op; reopening an existing main window preserves it; Moonlight close/reopen keeps MoonDock alive; explicit companion exit closes both.
+
+- Separate opening/showing Moonlight from deliberately disconnecting a stream.
+- Use the contextual **Stream anzeigen** label during a live stream.
+- Enable **Stream beenden** only for active streams; rename the bottom exit action to **MoonDock beenden**.
 
 ### 1.13.0
 
