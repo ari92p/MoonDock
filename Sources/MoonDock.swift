@@ -88,22 +88,14 @@ func describe(_ mode: CGDisplayMode) -> [String: Any] {
      "pixelHeight": mode.pixelHeight, "hz": mode.refreshRate, "modeID": mode.ioDisplayModeID]
 }
 
-func displayPlan() throws -> (CGDirectDisplayID, CGDisplayMode, CGDisplayMode) {
+func displayPlan() throws -> (CGDirectDisplayID, CGDisplayMode, CGDisplayMode?) {
     let display = CGMainDisplayID()
-    guard CGDisplayIsBuiltin(display) == 0 else {
+    guard let original = CGDisplayCopyDisplayMode(display) else {
         throw NSError(domain: "Moonlight4K", code: 1, userInfo: [NSLocalizedDescriptionKey:
-            "Bitte den externen 4K-Monitor als Hauptbildschirm verwenden. Das MacBook-Display wird nicht umgestellt."])
+            "Der aktuelle Bildschirmmodus konnte nicht gelesen werden."])
     }
-    guard let original = CGDisplayCopyDisplayMode(display),
-          let modes = CGDisplayCopyAllDisplayModes(display,
-            [kCGDisplayShowDuplicateLowResolutionModes as String: true] as CFDictionary) as? [CGDisplayMode],
-          let native = modes.first(where: {
-              $0.width == 3840 && $0.height == 2160 && $0.pixelWidth == 3840 && $0.pixelHeight == 2160
-                  && abs($0.refreshRate - 120) < 1
-          }) else {
-        throw NSError(domain: "Moonlight4K", code: 2, userInfo: [NSLocalizedDescriptionKey:
-            "Auf dem Hauptbildschirm ist natives 4K bei 120 Hz nicht verfügbar. Es wurde nichts umgestellt."])
-    }
+    // A 4K mode is an optional menu action, never a launch requirement.
+    let native = resolutionChoices(for: display).first(where: { $0.key == "native4k" })?.mode
     return (display, original, native)
 }
 
@@ -114,6 +106,8 @@ struct ResolutionChoice {
 }
 
 func resolutionChoices(for display: CGDirectDisplayID) -> [ResolutionChoice] {
+    // Keep the built-in display untouched; MoonDock still launches normally.
+    guard CGDisplayIsBuiltin(display) == 0 else { return [] }
     let modes = CGDisplayCopyAllDisplayModes(display,
         [kCGDisplayShowDuplicateLowResolutionModes as String: true] as CFDictionary) as? [CGDisplayMode] ?? []
     let at120 = modes.filter { abs($0.refreshRate - 120) < 1 }
@@ -168,7 +162,7 @@ if CommandLine.arguments.contains("--inspect") {
     do {
         let (display, original, native) = try displayPlan()
         let data = try JSONSerialization.data(withJSONObject:
-            ["display": display, "current": describe(original), "target": describe(native),
+            ["display": display, "current": describe(original), "target": native.map { describe($0) } as Any? ?? NSNull(),
              "moonlightRunning": !runningMoonlight().isEmpty,
              "frontmostBundle": NSWorkspace.shared.frontmostApplication?.bundleIdentifier ?? ""], options: [.prettyPrinted, .sortedKeys])
         print(String(decoding: data, as: UTF8.self))
@@ -315,6 +309,11 @@ final class Launcher: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 option.toolTip = "120 Hz. Mac-Oberfläche: \(choice.mode.width) × \(choice.mode.height); intern gerendert: \(choice.mode.pixelWidth) × \(choice.mode.pixelHeight). Der Stream wird vor dem Wechsel getrennt."
                 choicesMenu.addItem(option)
             }
+        }
+        if choicesMenu.items.isEmpty {
+            let unavailable = NSMenuItem(title: "Keine unterstützten externen Anzeigemodi", action: nil, keyEquivalent: "")
+            unavailable.isEnabled = false
+            choicesMenu.addItem(unavailable)
         }
         resolutions.submenu = choicesMenu
         resolutionMenu = choicesMenu

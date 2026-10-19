@@ -11,7 +11,7 @@ The menu bar uses a compact monochrome rectangle-and-crescent icon, without a mo
 - **Mac-Auflösung** lists Standard (2560 × 1440 HiDPI), native 3840 × 2160, and supported HiDPI modes at 120 Hz. The current mode is checked. Standard is the preferred working scale for this setup, not a universal macOS factory default. A mode change closes the local client before reconfiguring the display.
 - **MoonDock beenden** is the bottom item and closes Moonlight and MoonDock, restoring a display mode changed in the companion. Closing Moonlight itself, including the window close button or Command-Q, leaves MoonDock in the menu bar so it can reopen Moonlight.
 
-Starting MoonDock does not change the display mode. A manual mode selection ends the local Moonlight process before switching, then opens its main window. If a display mode was changed in MoonDock, explicitly quitting via **MoonDock beenden** restores the mode from startup. Closing Moonlight alone keeps the selected display mode while MoonDock remains running. Without a manual change, display settings are left alone. Temporary changes are also reverted by macOS if MoonDock crashes. Windows applications are not intentionally terminated.
+MoonDock also starts with only the built-in MacBook display connected, or with an external display that has no native 4K/120-Hz mode. Starting MoonDock does not change the display mode. A manual mode selection ends the local Moonlight process before switching, then opens its main window. If a display mode was changed in MoonDock, explicitly quitting via **MoonDock beenden** restores the mode from startup. Closing Moonlight alone keeps the selected display mode while MoonDock remains running. Without a manual change, display settings are left alone. Temporary changes are also reverted by macOS if MoonDock crashes. Windows applications are not intentionally terminated.
 
 Option–Command–Tab hides Moonlight and returns to the previous Mac app. This requires **System Settings → Privacy & Security → Accessibility → MoonDock**. The legacy bundle identifier is retained for compatibility with previous Moonlight 4K installations. Ad-hoc signed updates may require toggling this permission off and on. No input history is recorded.
 
@@ -22,7 +22,7 @@ MoonDock stays in the menu bar when Moonlight exits or its window is closed. Onl
 - macOS 13 or later; build and live checks currently performed on Apple Silicon/macOS 27.
 - Xcode Command Line Tools for building.
 - Moonlight installed at `/Applications/Moonlight.app`.
-- An external main display offering native 3840 × 2160 at 120 Hz. Only available modes are shown.
+- Any active Mac display. An external 4K/120-Hz monitor is optional. The resolution menu only offers supported external display modes; the built-in MacBook display is left untouched.
 
 ## Build and install
 
@@ -49,6 +49,8 @@ The normal launch opens Moonlight's main window; no host names or credentials ar
 `./scripts/install-mouse-helper.sh` installs a separate per-user helper that pauses Logi Options+ while Moonlight is running and restarts it afterward. This can free mouse side buttons for streaming, but also pauses other Options+ features for that duration. Install it only if that behavior is wanted. It does not read input. The existing legacy service name/path is retained to avoid duplicate helpers. Third-party mouse-gesture tools may also need their own Moonlight exception; MoonDock does not edit their settings.
 
 ## Validation and limits
+
+MoonDock 1.14.1 was launched with only the built-in MacBook display available: the companion remained running, Moonlight opened its main window, and the display mode stayed unchanged. The 4K target is optional and unsupported resolution actions are unavailable. External-monitor mode switching was not re-tested for this startup-only fix.
 
 The original custom launcher was tested with existing/hidden main windows, active Desktop streams, native 4K and representative HiDPI modes, and conditional display restoration. Live checks of MoonDock 1.11.0 on 17 October 2026 also confirmed:
 
