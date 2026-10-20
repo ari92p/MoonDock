@@ -11,6 +11,9 @@ let endStreamNotification = Notification.Name("de.mlemors.Moonlight4K.endStream"
 let mainWindowNotification = Notification.Name("de.mlemors.Moonlight4K.mainWindow")
 let permissionNotification = Notification.Name("de.mlemors.Moonlight4K.requestShortcutPermission")
 
+// UI text keys are the English strings; translations live in Resources/*.lproj.
+func L(_ key: String) -> String { NSLocalizedString(key, comment: "") }
+
 func makeMenuIcon() -> NSImage {
     let image = NSImage(size: NSSize(width: 20, height: 18), flipped: false) { _ in
         NSColor.black.setStroke()
@@ -92,7 +95,7 @@ func displayPlan() throws -> (CGDirectDisplayID, CGDisplayMode, CGDisplayMode?) 
     let display = CGMainDisplayID()
     guard let original = CGDisplayCopyDisplayMode(display) else {
         throw NSError(domain: "Moonlight4K", code: 1, userInfo: [NSLocalizedDescriptionKey:
-            "Der aktuelle Bildschirmmodus konnte nicht gelesen werden."])
+            L("The current display mode could not be read.")])
     }
     // A 4K mode is an optional menu action, never a launch requirement.
     let native = resolutionChoices(for: display).first(where: { $0.key == "native4k" })?.mode
@@ -115,11 +118,11 @@ func resolutionChoices(for display: CGDirectDisplayID) -> [ResolutionChoice] {
     if let standard = at120.first(where: { $0.width == 2560 && $0.height == 1440
         && $0.pixelWidth == 5120 && $0.pixelHeight == 2880 }) {
         result.append(ResolutionChoice(key: "hidpi:2560x1440",
-            title: "Standard – 2560 × 1440 (HiDPI)", mode: standard))
+            title: L("Default – 2560 × 1440 (HiDPI)"), mode: standard))
     }
     if let native = at120.first(where: { $0.width == 3840 && $0.height == 2160
         && $0.pixelWidth == 3840 && $0.pixelHeight == 2160 }) {
-        result.append(ResolutionChoice(key: "native4k", title: "4K nativ – 3840 × 2160", mode: native))
+        result.append(ResolutionChoice(key: "native4k", title: L("Native 4K – 3840 × 2160"), mode: native))
     }
     for width in [1920, 2048, 2304, 3008, 3200, 3360] {
         if let mode = at120.first(where: { $0.width == width && $0.height * 16 == width * 9
@@ -141,20 +144,20 @@ func apply(_ mode: CGDisplayMode, to display: CGDirectDisplayID) throws {
     let start = CGBeginDisplayConfiguration(&config)
     guard start == .success, let config = config else {
         throw NSError(domain: "Moonlight4K", code: Int(start.rawValue),
-            userInfo: [NSLocalizedDescriptionKey: "Die Anzeige-Konfiguration konnte nicht geöffnet werden."])
+            userInfo: [NSLocalizedDescriptionKey: L("The display configuration could not be opened.")])
     }
     let result = CGConfigureDisplayWithDisplayMode(config, display, mode, nil)
     guard result == .success else {
         CGCancelDisplayConfiguration(config)
         throw NSError(domain: "Moonlight4K", code: Int(result.rawValue),
-            userInfo: [NSLocalizedDescriptionKey: "Der Anzeigemodus konnte nicht eingestellt werden."])
+            userInfo: [NSLocalizedDescriptionKey: L("The display mode could not be set.")])
     }
     // Menu changes belong to this launcher. macOS also rolls them back
     // if this process crashes; startup itself never changes the display.
     let completed = CGCompleteDisplayConfiguration(config, .forAppOnly)
     guard completed == .success else {
         throw NSError(domain: "Moonlight4K", code: Int(completed.rawValue),
-            userInfo: [NSLocalizedDescriptionKey: "macOS hat den Anzeigewechsel abgelehnt."])
+            userInfo: [NSLocalizedDescriptionKey: L("macOS rejected the display change.")])
     }
 }
 
@@ -180,7 +183,7 @@ if CommandLine.arguments.contains("--list-resolutions") {
 if let index = CommandLine.arguments.firstIndex(of: "--resolution"), index + 1 < CommandLine.arguments.count {
     let key = CommandLine.arguments[index + 1]
     guard resolutionChoices(for: CGMainDisplayID()).contains(where: { $0.key == key }) else {
-        fputs("Dieser HiDPI-/4K-Modus ist nicht verfügbar.\n", stderr); exit(1)
+        fputs(L("This HiDPI/4K mode is not available.") + "\n", stderr); exit(1)
     }
     DistributedNotificationCenter.default().postNotificationName(resolutionNotification, object: key,
         userInfo: nil, deliverImmediately: true)
@@ -262,7 +265,7 @@ final class Launcher: NSObject, NSApplicationDelegate, NSMenuDelegate {
         // Never reconfigure while Moonlight already owns a window or a stream.
         if let existing = runningMoonlight().first {
             existing.activate(options: [.activateAllWindows])
-            message("Moonlight läuft bereits", "Beende Moonlight vollständig und öffne dann MoonDock erneut. Während einer laufenden Sitzung wird die Anzeige nicht umgestellt.")
+            message(L("Moonlight is already running"), L("Quit Moonlight completely, then open MoonDock again. The display is not reconfigured during a running session."))
             NSApp.terminate(nil); return
         }
         do {
@@ -270,7 +273,7 @@ final class Launcher: NSObject, NSApplicationDelegate, NSMenuDelegate {
             initialMode = before
             display = id; displayUUID = CGDisplayCreateUUIDFromDisplayID(id)?.takeRetainedValue()
         } catch {
-            message("MoonDock konnte nicht starten", error.localizedDescription)
+            message(L("MoonDock could not start"), error.localizedDescription)
             NSApp.terminate(nil); return
         }
         item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
@@ -279,22 +282,22 @@ final class Launcher: NSObject, NSApplicationDelegate, NSMenuDelegate {
         item?.button?.imagePosition = .imageOnly
         item?.button?.imageScaling = .scaleProportionallyDown
         item?.button?.setAccessibilityLabel("MoonDock")
-        item?.button?.toolTip = "MoonDock – manuelle Auflösungswahl wird beim Beenden zurückgesetzt"
+        item?.button?.toolTip = L("MoonDock – a manually selected resolution is restored on quit")
         let menu = NSMenu()
         menu.autoenablesItems = false
         menu.delegate = self
-        let settings = NSMenuItem(title: "Moonlight öffnen", action: #selector(showMainWindow), keyEquivalent: "")
+        let settings = NSMenuItem(title: L("Open Moonlight"), action: #selector(showMainWindow), keyEquivalent: "")
         settings.target = self; menu.addItem(settings)
         openMenuItem = settings
-        let endStream = NSMenuItem(title: "Stream beenden", action: #selector(endCurrentStream), keyEquivalent: "")
+        let endStream = NSMenuItem(title: L("End Stream"), action: #selector(endCurrentStream), keyEquivalent: "")
         endStream.target = self
         endStream.isEnabled = false
-        endStream.toolTip = "Stream trennen und das Hauptfenster öffnen. MoonDock und die aktuelle Mac-Auflösung bleiben erhalten."
+        endStream.toolTip = L("Disconnect the stream and open the main window. MoonDock and the current Mac resolution stay as they are.")
         endStreamMenuItem = endStream
         menu.addItem(endStream)
         menu.addItem(.separator())
-        let resolutions = NSMenuItem(title: "Mac-Auflösung", action: nil, keyEquivalent: "")
-        let choicesMenu = NSMenu(title: "Mac-Auflösung")
+        let resolutions = NSMenuItem(title: L("Mac Resolution"), action: nil, keyEquivalent: "")
+        let choicesMenu = NSMenu(title: L("Mac Resolution"))
         choicesMenu.autoenablesItems = false
         choicesMenu.delegate = self
         if let display = display {
@@ -306,12 +309,13 @@ final class Launcher: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 let option = NSMenuItem(title: choice.title, action: #selector(selectResolution(_:)), keyEquivalent: "")
                 option.target = self
                 option.representedObject = choice.key
-                option.toolTip = "120 Hz. Mac-Oberfläche: \(choice.mode.width) × \(choice.mode.height); intern gerendert: \(choice.mode.pixelWidth) × \(choice.mode.pixelHeight). Der Stream wird vor dem Wechsel getrennt."
+                option.toolTip = String(format: L("120 Hz. Mac interface: %@; rendered internally: %@. The stream is disconnected before switching."),
+                    "\(choice.mode.width) × \(choice.mode.height)", "\(choice.mode.pixelWidth) × \(choice.mode.pixelHeight)")
                 choicesMenu.addItem(option)
             }
         }
         if choicesMenu.items.isEmpty {
-            let unavailable = NSMenuItem(title: "Keine unterstützten externen Anzeigemodi", action: nil, keyEquivalent: "")
+            let unavailable = NSMenuItem(title: L("No supported external display modes"), action: nil, keyEquivalent: "")
             unavailable.isEnabled = false
             choicesMenu.addItem(unavailable)
         }
@@ -320,9 +324,9 @@ final class Launcher: NSObject, NSApplicationDelegate, NSMenuDelegate {
         menu.addItem(resolutions)
         refreshResolutionMenu()
         menu.addItem(.separator())
-        let stop = NSMenuItem(title: "MoonDock beenden", action: #selector(stopMoonlight), keyEquivalent: "")
+        let stop = NSMenuItem(title: L("Quit MoonDock"), action: #selector(stopMoonlight), keyEquivalent: "")
         stop.target = self
-        stop.toolTip = "Moonlight und MoonDock schließen und eine im Menü geänderte Mac-Auflösung zurückstellen."
+        stop.toolTip = L("Close Moonlight and MoonDock and restore a Mac resolution changed in this menu.")
         menu.addItem(stop)
         item?.menu = menu
         DistributedNotificationCenter.default().addObserver(self, selector: #selector(stopMoonlight),
@@ -359,7 +363,7 @@ final class Launcher: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 do { try process.run(); self.launching = false }
                 catch {
                     self.launching = false
-                    self.message("Moonlight konnte nicht geöffnet werden", error.localizedDescription)
+                    self.message(L("Moonlight could not be opened"), error.localizedDescription)
 
                 }
                 return
@@ -372,7 +376,7 @@ final class Launcher: NSObject, NSApplicationDelegate, NSMenuDelegate {
                     guard let self = self else { return }
                     self.launching = false
                     if let error = error {
-                        self.message("Moonlight konnte nicht geöffnet werden", error.localizedDescription)
+                        self.message(L("Moonlight could not be opened"), error.localizedDescription)
 
                     }
                 }
@@ -397,14 +401,14 @@ final class Launcher: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }, 1, &event, Unmanaged.passUnretained(self).toOpaque(), &returnEventHandler)
         guard install == noErr else {
             UserDefaults.standard.set(Int(install), forKey: "returnHotKeyStatus")
-            message("Rückweg zum Mac", "Die Tastenkombination konnte nicht eingerichtet werden. Das 4K-Menü bleibt verfügbar.")
+            message(L("Return to Mac"), L("The keyboard shortcut could not be set up. The MoonDock menu remains available."))
             return
         }
         let result = RegisterEventHotKey(UInt32(kVK_Tab), UInt32(cmdKey | optionKey),
             EventHotKeyID(signature: 0x4D4C344B, id: 1), GetApplicationEventTarget(), 0, &returnHotKey)
         UserDefaults.standard.set(Int(result), forKey: "returnHotKeyStatus")
         if result != noErr {
-            message("Rückweg zum Mac", "⌥⌘Tab konnte nicht registriert werden (Code \(result)). Du kannst weiterhin das 4K-Menü verwenden.")
+            message(L("Return to Mac"), String(format: L("⌥⌘Tab could not be registered (code %d). You can still use the MoonDock menu."), result))
         }
     }
 
@@ -478,7 +482,7 @@ final class Launcher: NSObject, NSApplicationDelegate, NSMenuDelegate {
     func refreshWorkflowMenu() {
         let streaming = runningMoonlight().contains(where: { moonlightIsStreaming($0) })
         let available = !returningToMain && !stopping && !finishing && !launching
-        openMenuItem?.title = streaming ? "Stream anzeigen" : "Moonlight öffnen"
+        openMenuItem?.title = streaming ? L("Show Stream") : L("Open Moonlight")
         openMenuItem?.isEnabled = available
         endStreamMenuItem?.isEnabled = available && streaming
     }
@@ -529,13 +533,13 @@ final class Launcher: NSObject, NSApplicationDelegate, NSMenuDelegate {
                       CFEqual(savedUUID, currentUUID),
                       let choice = resolutionChoices(for: display).first(where: { $0.key == key }) else {
                     throw NSError(domain: "Moonlight4K", code: 3, userInfo: [NSLocalizedDescriptionKey:
-                        "Die Anzeige oder die Moonlight-Sitzung hat sich geändert. Die Auflösung wurde nicht umgestellt."])
+                        L("The display or the Moonlight session changed. The resolution was not switched.")])
                 }
                 try apply(choice.mode, to: display)
                 self.didChangeResolution = true
                 guard let current = CGDisplayCopyDisplayMode(display), sameMode(current, choice.mode) else {
                     throw NSError(domain: "Moonlight4K", code: 4, userInfo: [NSLocalizedDescriptionKey:
-                        "macOS hat den gewünschten Anzeigemodus nicht bestätigt."])
+                        L("macOS did not confirm the requested display mode.")])
                 }
                 UserDefaults.standard.set(key, forKey: "lastResolutionSelection")
                 DispatchQueue.main.asyncAfter(deadline: .now() + 2) { [weak self] in
@@ -546,7 +550,7 @@ final class Launcher: NSObject, NSApplicationDelegate, NSMenuDelegate {
             } catch {
                 self.resolutionApplying = false
                 UserDefaults.standard.set(error.localizedDescription, forKey: "lastResolutionError")
-                self.message("Mac-Auflösung", error.localizedDescription)
+                self.message(L("Mac Resolution"), error.localizedDescription)
                 self.openMainWindow()
             }
         }
@@ -615,7 +619,7 @@ final class Launcher: NSObject, NSApplicationDelegate, NSMenuDelegate {
                     return
                 }
                 if let error = error {
-                    self.message("Moonlight-Hauptfenster", error.localizedDescription)
+                    self.message(L("Moonlight Main Window"), error.localizedDescription)
 
                 } else if let app = app {
                     _ = app.unhide()
@@ -693,7 +697,7 @@ final class Launcher: NSObject, NSApplicationDelegate, NSMenuDelegate {
            CFEqual(saved, currentUUID) {
             if let current = CGDisplayCopyDisplayMode(id), !sameMode(current, before) {
                 do { try apply(before, to: id) }
-                catch { message("Anzeige zurückstellen", "macOS übernimmt beim Beenden die Wiederherstellung der temporären Auflösungswahl.\n\n" + error.localizedDescription) }
+                catch { message(L("Restore Display"), L("macOS will restore the temporary resolution when MoonDock quits.") + "\n\n" + error.localizedDescription) }
             }
         }
         NSApp.terminate(nil)

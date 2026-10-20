@@ -4,14 +4,14 @@ A small macOS menu-bar companion for [Moonlight](https://github.com/moonlight-st
 
 MoonDock does not bundle, patch, or configure Moonlight or Sunshine. No host names, credentials, or pairing data are stored in the source.
 
-> **Note:** The user interface is currently German only. Menu labels are quoted below with an English description.
+The interface is available in English and German and follows the macOS system language. Other languages fall back to English.
 
 ## Features
 
-- **Moonlight öffnen / Stream anzeigen** (Open Moonlight / Show stream). Opens or raises Moonlight's main window. During a stream it raises the stream instead, without disconnecting.
-- **Stream beenden** (End stream). Enabled only while a stream is running. It closes the local stream and reopens Moonlight's main window.
-- **Mac-Auflösung** (Mac resolution). Lists 120-Hz modes of the main display: 2560 × 1440 HiDPI, native 3840 × 2160, and several 16:9 HiDPI scales. The current mode is checked. Moonlight is closed before the mode changes and reopened afterwards.
-- **MoonDock beenden** (Quit MoonDock). Closes Moonlight and MoonDock and restores the display mode that was active when MoonDock started, but only if you changed it from the menu.
+- **Open Moonlight / Show Stream**. Opens or raises Moonlight's main window. During a stream it raises the stream instead, without disconnecting.
+- **End Stream**. Enabled only while a stream is running. It closes the local stream and reopens Moonlight's main window.
+- **Mac Resolution**. Lists 120-Hz modes of the main display: 2560 × 1440 HiDPI, native 3840 × 2160, and several 16:9 HiDPI scales. The current mode is checked. Moonlight is closed before the mode changes and reopened afterwards.
+- **Quit MoonDock**. Closes Moonlight and MoonDock and restores the display mode that was active when MoonDock started, but only if you changed it from the menu.
 - **⌥⌘Tab** hides Moonlight and returns to the previously active Mac app, even while a stream captures the keyboard.
 
 Closing Moonlight itself (window close button or ⌘Q) leaves MoonDock in the menu bar, so you can reopen Moonlight from there. Starting MoonDock never changes the display mode. Display changes are made with `kCGConfigureForAppOnly`, so macOS reverts them if MoonDock crashes.
@@ -42,6 +42,10 @@ To start a desktop stream directly instead of the main window:
 ## Permissions
 
 The ⌥⌘Tab shortcut needs **System Settings → Privacy & Security → Accessibility → MoonDock**. MoonDock uses this permission to watch for the Tab key while Moonlight is in front. Other keys are passed through untouched, and nothing is recorded or logged. With an ad-hoc signed build you may need to turn the permission off and on again after each update.
+
+## Translations
+
+UI strings use their English text as the key, wrapped in `L("…")` in `Sources/MoonDock.swift`. Translations live in `Resources/<language>.lproj/Localizable.strings`. To add a language, copy `Resources/de.lproj`, translate the values, and add the language code to `CFBundleLocalizations` in `Resources/Info.plist`. `build.sh` copies every `.lproj` folder into the app.
 
 ## Optional: Logitech Options+ helper
 

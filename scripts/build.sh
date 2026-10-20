@@ -5,6 +5,12 @@ stage="$(mktemp -d /private/tmp/moondock-build.XXXXXX)"
 app="$stage/MoonDock.app"
 mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources" "$root/build"
 cp "$root/Resources/Info.plist" "$app/Contents/Info.plist"
+for strings in "$root"/Resources/*.lproj/Localizable.strings; do
+  plutil -lint -s "$strings"
+  lproj="$(basename "$(dirname "$strings")")"
+  mkdir -p "$app/Contents/Resources/$lproj"
+  cp "$strings" "$app/Contents/Resources/$lproj/"
+done
 xcrun swiftc "$root/Sources/MoonDock.swift" \
   -module-cache-path "$stage/swift-cache" \
   -o "$app/Contents/MacOS/MoonDock" \

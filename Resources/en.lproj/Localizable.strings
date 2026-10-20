@@ -1,0 +1,31 @@
+/* English base strings. Keys equal values; see Sources/MoonDock.swift. */
+
+"120 Hz. Mac interface: %@; rendered internally: %@. The stream is disconnected before switching." = "120 Hz. Mac interface: %@; rendered internally: %@. The stream is disconnected before switching.";
+"Close Moonlight and MoonDock and restore a Mac resolution changed in this menu." = "Close Moonlight and MoonDock and restore a Mac resolution changed in this menu.";
+"Default – 2560 × 1440 (HiDPI)" = "Default – 2560 × 1440 (HiDPI)";
+"Disconnect the stream and open the main window. MoonDock and the current Mac resolution stay as they are." = "Disconnect the stream and open the main window. MoonDock and the current Mac resolution stay as they are.";
+"End Stream" = "End Stream";
+"Mac Resolution" = "Mac Resolution";
+"MoonDock could not start" = "MoonDock could not start";
+"MoonDock – a manually selected resolution is restored on quit" = "MoonDock – a manually selected resolution is restored on quit";
+"Moonlight Main Window" = "Moonlight Main Window";
+"Moonlight could not be opened" = "Moonlight could not be opened";
+"Moonlight is already running" = "Moonlight is already running";
+"Native 4K – 3840 × 2160" = "Native 4K – 3840 × 2160";
+"No supported external display modes" = "No supported external display modes";
+"Open Moonlight" = "Open Moonlight";
+"Quit MoonDock" = "Quit MoonDock";
+"Quit Moonlight completely, then open MoonDock again. The display is not reconfigured during a running session." = "Quit Moonlight completely, then open MoonDock again. The display is not reconfigured during a running session.";
+"Restore Display" = "Restore Display";
+"Return to Mac" = "Return to Mac";
+"Show Stream" = "Show Stream";
+"The current display mode could not be read." = "The current display mode could not be read.";
+"The display configuration could not be opened." = "The display configuration could not be opened.";
+"The display mode could not be set." = "The display mode could not be set.";
+"The display or the Moonlight session changed. The resolution was not switched." = "The display or the Moonlight session changed. The resolution was not switched.";
+"The keyboard shortcut could not be set up. The MoonDock menu remains available." = "The keyboard shortcut could not be set up. The MoonDock menu remains available.";
+"This HiDPI/4K mode is not available." = "This HiDPI/4K mode is not available.";
+"macOS did not confirm the requested display mode." = "macOS did not confirm the requested display mode.";
+"macOS rejected the display change." = "macOS rejected the display change.";
+"macOS will restore the temporary resolution when MoonDock quits." = "macOS will restore the temporary resolution when MoonDock quits.";
+"⌥⌘Tab could not be registered (code %d). You can still use the MoonDock menu." = "⌥⌘Tab could not be registered (code %d). You can still use the MoonDock menu.";
