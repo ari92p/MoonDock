@@ -1,28 +1,27 @@
 # MoonDock
 
-A macOS menu-bar companion for [Moonlight](https://github.com/moonlight-stream/moonlight-qt). MoonDock manages the local Moonlight window and offers manual native-4K/HiDPI display modes. It does not bundle or modify Moonlight or Sunshine.
+A small macOS menu-bar companion for [Moonlight](https://github.com/moonlight-stream/moonlight-qt). MoonDock opens and raises the Moonlight window, can end a running stream without quitting Moonlight, and offers a menu to switch an external 4K/120-Hz display between native 4K and HiDPI modes.
 
-## Menu
+MoonDock does not bundle, patch, or configure Moonlight or Sunshine. No host names, credentials, or pairing data are stored in the source.
 
-The menu bar uses a compact monochrome rectangle-and-crescent icon, without a monitor stand or a text label. macOS adapts its template tint to light/dark menu bars; the tooltip and accessibility label remain MoonDock.
+> **Note:** The user interface is currently German only. Menu labels are quoted below with an English description.
 
-- **Moonlight öffnen** opens or raises the main window when no stream is active. During a stream the same item reads **Stream anzeigen** and raises that live stream without disconnecting it.
-- **Stream beenden** is enabled only while streaming. It disconnects the local stream and opens Moonlight's main window, keeping MoonDock and the selected Mac display mode alive.
-- **Mac-Auflösung** lists Standard (2560 × 1440 HiDPI), native 3840 × 2160, and supported HiDPI modes at 120 Hz. The current mode is checked. Standard is the preferred working scale for this setup, not a universal macOS factory default. A mode change closes the local client before reconfiguring the display.
-- **MoonDock beenden** is the bottom item and closes Moonlight and MoonDock, restoring a display mode changed in the companion. Closing Moonlight itself, including the window close button or Command-Q, leaves MoonDock in the menu bar so it can reopen Moonlight.
+## Features
 
-MoonDock also starts with only the built-in MacBook display connected, or with an external display that has no native 4K/120-Hz mode. Starting MoonDock does not change the display mode. A manual mode selection ends the local Moonlight process before switching, then opens its main window. If a display mode was changed in MoonDock, explicitly quitting via **MoonDock beenden** restores the mode from startup. Closing Moonlight alone keeps the selected display mode while MoonDock remains running. Without a manual change, display settings are left alone. Temporary changes are also reverted by macOS if MoonDock crashes. Windows applications are not intentionally terminated.
+- **Moonlight öffnen / Stream anzeigen** (Open Moonlight / Show stream). Opens or raises Moonlight's main window. During a stream it raises the stream instead, without disconnecting.
+- **Stream beenden** (End stream). Enabled only while a stream is running. It closes the local stream and reopens Moonlight's main window.
+- **Mac-Auflösung** (Mac resolution). Lists 120-Hz modes of the main display: 2560 × 1440 HiDPI, native 3840 × 2160, and several 16:9 HiDPI scales. The current mode is checked. Moonlight is closed before the mode changes and reopened afterwards.
+- **MoonDock beenden** (Quit MoonDock). Closes Moonlight and MoonDock and restores the display mode that was active when MoonDock started, but only if you changed it from the menu.
+- **⌥⌘Tab** hides Moonlight and returns to the previously active Mac app, even while a stream captures the keyboard.
 
-Option–Command–Tab hides Moonlight and returns to the previous Mac app. This requires **System Settings → Privacy & Security → Accessibility → MoonDock**. The legacy bundle identifier is retained for compatibility with previous Moonlight 4K installations. Ad-hoc signed updates may require toggling this permission off and on. No input history is recorded.
-
-MoonDock stays in the menu bar when Moonlight exits or its window is closed. Only the companion's **MoonDock beenden** action ends both apps and restores a manually changed display mode. That explicit stop still reacts directly to process termination without the old extra two-second delay. Intentional stream/main-window and display-mode transitions also keep MoonDock running.
+Closing Moonlight itself (window close button or ⌘Q) leaves MoonDock in the menu bar, so you can reopen Moonlight from there. Starting MoonDock never changes the display mode. Display changes are made with `kCGConfigureForAppOnly`, so macOS reverts them if MoonDock crashes.
 
 ## Requirements
 
-- macOS 13 or later; build and live checks currently performed on Apple Silicon/macOS 27.
-- Xcode Command Line Tools for building.
+- macOS 13 or later (developed and tested on Apple Silicon).
+- Xcode Command Line Tools (`xcode-select --install`) for building.
 - Moonlight installed at `/Applications/Moonlight.app`.
-- Any active Mac display. An external 4K/120-Hz monitor is optional. The resolution menu only offers supported external display modes; the built-in MacBook display is left untouched.
+- For the resolution menu: an external main display with 4K modes at 120 Hz. Without one, MoonDock still works, and the menu shows no modes. The built-in MacBook display is never reconfigured.
 
 ## Build and install
 
@@ -32,70 +31,29 @@ MoonDock stays in the menu bar when Moonlight exits or its window is closed. Onl
 open /Applications/MoonDock.app
 ```
 
-The build creates an ad-hoc signed application in a temporary directory and `build/MoonDock.zip`. Set `CODE_SIGN_IDENTITY` when building with your own signing identity. Build output is not committed. A source archive alone is not an installed app. Quit MoonDock before updating it.
+`build.sh` compiles the app into a temporary directory, renders the icon, and writes `build/MoonDock.zip`. The app is ad-hoc signed by default. Set `CODE_SIGN_IDENTITY` to sign with your own identity. Quit MoonDock before running `install.sh` again for an update.
 
-The previous custom launcher was named **Moonlight 4K**. Stop that launcher before opening MoonDock; do not run both together. Both use the same internal bundle identity/notifications for migration compatibility.
-
-An optional direct Desktop connection can be started with:
+To start a desktop stream directly instead of the main window:
 
 ```sh
-/Applications/MoonDock.app/Contents/MacOS/MoonDock --desktop WINDOWS_HOSTNAME
+/Applications/MoonDock.app/Contents/MacOS/MoonDock --desktop YOUR_HOST
 ```
 
-The normal launch opens Moonlight's main window; no host names or credentials are embedded in the source.
+## Permissions
 
-## Optional Logitech helper
+The ⌥⌘Tab shortcut needs **System Settings → Privacy & Security → Accessibility → MoonDock**. MoonDock uses this permission to watch for the Tab key while Moonlight is in front. Other keys are passed through untouched, and nothing is recorded or logged. With an ad-hoc signed build you may need to turn the permission off and on again after each update.
 
-`./scripts/install-mouse-helper.sh` installs a separate per-user helper that pauses Logi Options+ while Moonlight is running and restarts it afterward. This can free mouse side buttons for streaming, but also pauses other Options+ features for that duration. Install it only if that behavior is wanted. It does not read input. The existing legacy service name/path is retained to avoid duplicate helpers. Third-party mouse-gesture tools may also need their own Moonlight exception; MoonDock does not edit their settings.
+## Optional: Logitech Options+ helper
 
-## Validation and limits
+`./scripts/install-mouse-helper.sh` installs a per-user LaunchAgent that pauses Logi Options+ while Moonlight runs and restarts it afterwards. This frees mouse side buttons for the stream, but also pauses all other Options+ features during that time. The helper only checks whether Moonlight is running; it does not read any input. Install it only if you want this behavior.
 
-MoonDock 1.14.1 was launched with only the built-in MacBook display available: the companion remained running, Moonlight opened its main window, and the display mode stayed unchanged. The 4K target is optional and unsupported resolution actions are unavailable. External-monitor mode switching was not re-tested for this startup-only fix.
+## How it works and limits
 
-The original custom launcher was tested with existing/hidden main windows, active Desktop streams, native 4K and representative HiDPI modes, and conditional display restoration. Live checks of MoonDock 1.11.0 on 17 October 2026 also confirmed:
+- MoonDock detects an active stream by inspecting Moonlight's UDP sockets and its log file. Moonlight has no public control API, so future Moonlight versions may need adjustments. If the state is unclear, MoonDock raises the existing window rather than closing anything.
+- The offered resolutions are tuned for a 4K/120-Hz monitor and are hard-coded in `resolutionChoices(for:)`. Other monitors may show fewer or no modes.
+- Display changes happen only after the Moonlight process has exited, with a short settling delay.
+- The bundle identifier `de.mlemors.Moonlight4K` comes from the project's earlier name and is kept so existing Accessibility permissions keep working.
 
-- Normal Moonlight Quit (the same application-quit path used by Command-Q) closes MoonDock about 0.01 seconds after the Moonlight process exits, versus 2.95 seconds in the previous launcher.
-- With a manually changed display mode, normal Quit restores the original mode and closes MoonDock; the measured additional time including restoration was 0.335 seconds.
-- An intentional active-stream → main-window transition keeps the same MoonDock process alive.
-- Starting and quitting without a manual mode selection does not change the display.
+## License
 
-These are observations on the tested machine, not timing guarantees for every Mac. Games are not automatically launched by these checks.
-
-Streaming is identified from local process transport sockets and Moonlight's process-owned log; this is not a public Moonlight control API. If no active stream is established by that inspection, MoonDock favors raising the existing app. Future Moonlight changes may require adapting detection.
-
-A prior WindowServer hang during display experimentation was not conclusively diagnosed. Display changes therefore take place only after the Moonlight process has exited, with a settling interval. These checks do not establish long-term stability.
-
-## Change history
-
-### 1.14.0
-
-Live checked: showing an active stream preserves the same client process; ending it opens the main window without changing the display or MoonDock process; stopping with no stream is a no-op; reopening an existing main window preserves it; Moonlight close/reopen keeps MoonDock alive; explicit companion exit closes both.
-
-- Separate opening/showing Moonlight from deliberately disconnecting a stream.
-- Use the contextual **Stream anzeigen** label during a live stream.
-- Enable **Stream beenden** only for active streams; rename the bottom exit action to **MoonDock beenden**.
-
-### 1.13.0
-
-Live checked: closing Moonlight leaves the same MoonDock process and the selected display mode intact; the menu reopens Moonlight; explicitly exiting MoonDock while Moonlight is already closed restores the original display mode and quits the companion.
-
-- Keep MoonDock running after Moonlight closes, including Command-Q and window-close exits.
-- Reopen Moonlight from the menu, now labeled **Moonlight öffnen**.
-- Restore manual display changes only when explicitly exiting MoonDock; keep the no-delay stop behavior.
-
-### 1.12.1
-
-- Add the matching rectangle-and-crescent application icon for Finder and Dock, without a monitor stand.
-- Generate the complete Retina ICNS icon set from vector artwork during the build.
-
-### 1.12.0
-
-- Replace the menu-bar text with the selected rectangle-and-crescent symbol, without a monitor stand.
-- Draw it as a resolution-independent template image and retain the MoonDock accessibility label.
-
-### 1.11.0
-
-- Renamed the custom launcher to MoonDock.
-- React directly to Moonlight termination and remove the unconditional post-exit delay.
-- Preserve intentional main-window and resolution transitions.
-- Extract a standalone, reproducible source/build project; no Sunshine settings, pairing data, SSH keys, or diagnostic exports are included.
+[MIT](LICENSE)
