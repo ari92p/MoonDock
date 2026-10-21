@@ -21,7 +21,17 @@ xcrun swiftc "$root/scripts/render-app-icon.swift" \
 "$stage/render-app-icon" "$stage/MoonDock.iconset"
 /usr/bin/iconutil -c icns -o "$app/Contents/Resources/MoonDock.icns" "$stage/MoonDock.iconset"
 cp "$stage/MoonDock.iconset/icon_512x512@2x.png" "$root/build/MoonDock-icon.png"
-codesign --force --sign "${CODE_SIGN_IDENTITY:--}" \
+# A stable identity keeps the Accessibility permission across updates.
+# Ad-hoc signatures change with every build and need the permission re-granted.
+identity="${CODE_SIGN_IDENTITY:-}"
+if [[ -z "$identity" && -f "$root/signing-identity.local" ]]; then
+  identity="$(head -n 1 "$root/signing-identity.local" | tr -d '[:space:]')"
+fi
+if [[ -z "$identity" ]]; then
+  identity="-"
+  echo 'No signing identity configured; signing ad-hoc (see README, "Code signing").' >&2
+fi
+codesign --force --timestamp=none --sign "$identity" \
   --identifier de.mlemors.Moonlight4K "$app"
 codesign --verify --deep --strict "$app"
 /usr/bin/ditto -c -k --norsrc --keepParent "$app" "$root/build/MoonDock.zip"

@@ -31,7 +31,20 @@ Closing Moonlight itself (window close button or ⌘Q) leaves MoonDock in the me
 open /Applications/MoonDock.app
 ```
 
-`build.sh` compiles the app into a temporary directory, renders the icon, and writes `build/MoonDock.zip`. The app is ad-hoc signed by default. Set `CODE_SIGN_IDENTITY` to sign with your own identity. Quit MoonDock before running `install.sh` again for an update.
+`build.sh` compiles the app into a temporary directory, renders the icon, and writes `build/MoonDock.zip`. Quit MoonDock before running `install.sh` again for an update.
+
+### Code signing
+
+macOS ties the Accessibility permission to the app's signature. Without further setup the build is ad-hoc signed, which changes with every build, so ⌥⌘Tab stops working after each update until you re-grant the permission.
+
+To keep the permission across updates, sign with a stable identity from your keychain, for example an Apple Development certificate or a self-signed code-signing certificate:
+
+```sh
+security find-identity -v -p codesigning
+echo "YOUR_IDENTITY_HASH_OR_NAME" > signing-identity.local
+```
+
+`build.sh` reads `signing-identity.local` (ignored by Git), or the `CODE_SIGN_IDENTITY` environment variable, which takes precedence. After the first install with a new identity, grant the permission once more; later updates keep it.
 
 To start a desktop stream directly instead of the main window:
 
@@ -41,7 +54,7 @@ To start a desktop stream directly instead of the main window:
 
 ## Permissions
 
-The ⌥⌘Tab shortcut needs **System Settings → Privacy & Security → Accessibility → MoonDock**. MoonDock uses this permission to watch for the Tab key while Moonlight is in front. Other keys are passed through untouched, and nothing is recorded or logged. With an ad-hoc signed build you may need to turn the permission off and on again after each update.
+The ⌥⌘Tab shortcut needs **System Settings → Privacy & Security → Accessibility → MoonDock**. MoonDock uses this permission to watch for the Tab key while Moonlight is in front. Other keys are passed through untouched, and nothing is recorded or logged. With an ad-hoc signed build you need to turn the permission off and on again after each update; see [Code signing](#code-signing).
 
 ## Translations
 
