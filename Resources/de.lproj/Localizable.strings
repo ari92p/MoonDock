@@ -6,6 +6,8 @@
 "End Stream" = "Stream beenden";
 "Mac Resolution" = "Mac-Auflösung";
 "Quit MoonDock" = "MoonDock beenden";
+"Launch at Login" = "Beim Anmelden starten";
+"About MoonDock" = "Über MoonDock";
 "Default – 2560 × 1440 (HiDPI)" = "Standard – 2560 × 1440 (HiDPI)";
 "Native 4K – 3840 × 2160" = "4K nativ – 3840 × 2160";
 "No supported external display modes" = "Keine unterstützten externen Anzeigemodi";
@@ -13,12 +15,10 @@
 /* Tooltips */
 "MoonDock – a manually selected resolution is restored on quit" = "MoonDock – manuelle Auflösungswahl wird beim Beenden zurückgesetzt";
 "Disconnect the stream and open the main window. MoonDock and the current Mac resolution stay as they are." = "Stream trennen und das Hauptfenster öffnen. MoonDock und die aktuelle Mac-Auflösung bleiben erhalten.";
-"120 Hz. Mac interface: %@; rendered internally: %@. The stream is disconnected before switching." = "120 Hz. Mac-Oberfläche: %1$@; intern gerendert: %2$@. Der Stream wird vor dem Wechsel getrennt.";
+"%@ Hz. Mac interface: %@; rendered internally: %@. The stream is disconnected before switching." = "%1$@ Hz. Mac-Oberfläche: %2$@; intern gerendert: %3$@. Der Stream wird vor dem Wechsel getrennt.";
 "Close Moonlight and MoonDock and restore a Mac resolution changed in this menu." = "Moonlight und MoonDock schließen und eine im Menü geänderte Mac-Auflösung zurückstellen.";
 
 /* Alerts */
-"Moonlight is already running" = "Moonlight läuft bereits";
-"Quit Moonlight completely, then open MoonDock again. The display is not reconfigured during a running session." = "Beende Moonlight vollständig und öffne dann MoonDock erneut. Während einer laufenden Sitzung wird die Anzeige nicht umgestellt.";
 "MoonDock could not start" = "MoonDock konnte nicht starten";
 "Moonlight could not be opened" = "Moonlight konnte nicht geöffnet werden";
 "Moonlight Main Window" = "Moonlight-Hauptfenster";

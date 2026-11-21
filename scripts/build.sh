@@ -2,9 +2,17 @@
 set -euo pipefail
 root="$(cd "$(dirname "$0")/.." && pwd)"
 stage="$(mktemp -d /private/tmp/moondock-build.XXXXXX)"
-app="$stage/MoonDock.app"
+trap 'rm -rf "$stage"' EXIT
+# The finished app lives in build/ so that install.sh still finds it after a reboot.
+app="$root/build/MoonDock.app"
+rm -rf "$app"
 mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources" "$root/build"
 cp "$root/Resources/Info.plist" "$app/Contents/Info.plist"
+# The build number follows the commit count (plus a fixed offset), so it never needs a manual bump.
+# Offset 6 continues the numbering of the earlier manual bumps (build 19 at 13 commits).
+if commits="$(git -C "$root" rev-list --count HEAD 2>/dev/null)"; then
+  /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $((commits + 6))" "$app/Contents/Info.plist"
+fi
 for strings in "$root"/Resources/*.lproj/Localizable.strings; do
   plutil -lint -s "$strings"
   lproj="$(basename "$(dirname "$strings")")"
@@ -14,7 +22,8 @@ done
 xcrun swiftc "$root/Sources/MoonDock.swift" \
   -module-cache-path "$stage/swift-cache" \
   -o "$app/Contents/MacOS/MoonDock" \
-  -framework AppKit -framework CoreGraphics -framework Carbon -framework ApplicationServices
+  -framework AppKit -framework CoreGraphics -framework Carbon -framework ApplicationServices \
+  -framework ServiceManagement
 xcrun swiftc "$root/scripts/render-app-icon.swift" \
   -module-cache-path "$stage/swift-cache" \
   -o "$stage/render-app-icon" -framework AppKit
@@ -35,5 +44,4 @@ codesign --force --timestamp=none --sign "$identity" \
   --identifier de.mlemors.Moonlight4K "$app"
 codesign --verify --deep --strict "$app"
 /usr/bin/ditto -c -k --norsrc --keepParent "$app" "$root/build/MoonDock.zip"
-printf '%s\n' "$app" > "$root/build/app-path.txt"
 printf 'Built %s\nArchive: %s\n' "$app" "$root/build/MoonDock.zip"

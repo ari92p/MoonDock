@@ -5,12 +5,8 @@ if /usr/bin/pgrep -f '^/Applications/MoonDock.app/Contents/MacOS/MoonDock' >/dev
   echo 'Quit MoonDock before installing an update.' >&2
   exit 1
 fi
-if [[ ! -f "$root/build/app-path.txt" ]]; then "$root/scripts/build.sh"; fi
-app="$(cat "$root/build/app-path.txt")"
-if [[ ! -x "$app/Contents/MacOS/MoonDock" ]]; then
-  echo 'Build staging directory is missing; run scripts/build.sh again.' >&2
-  exit 1
-fi
+app="$root/build/MoonDock.app"
+if [[ ! -x "$app/Contents/MacOS/MoonDock" ]]; then "$root/scripts/build.sh"; fi
 old_requirement="$(codesign -d -r- /Applications/MoonDock.app 2>/dev/null | sed -n 's/^designated => //p' || true)"
 /usr/bin/ditto --norsrc "$app" /Applications/MoonDock.app
 codesign --verify --deep --strict /Applications/MoonDock.app

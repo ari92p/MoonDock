@@ -2,6 +2,7 @@ import AppKit
 import CoreGraphics
 import Carbon
 import ApplicationServices
+import ServiceManagement
 
 let moonlightID = "com.moonlight-stream.Moonlight"
 let stopNotification = Notification.Name("de.mlemors.Moonlight4K.stop")
@@ -37,6 +38,18 @@ func makeMenuIcon() -> NSImage {
     image.isTemplate = true
     image.accessibilityDescription = "MoonDock"
     return image
+}
+
+/// Where Moonlight is installed: wherever macOS finds the bundle identifier
+/// (/Applications, ~/Applications, ...), falling back to /Applications.
+func moonlightAppURL() -> URL {
+    NSWorkspace.shared.urlForApplication(withBundleIdentifier: moonlightID)
+        ?? URL(fileURLWithPath: "/Applications/Moonlight.app")
+}
+
+func moonlightExecutableURL() -> URL {
+    let app = moonlightAppURL()
+    return Bundle(url: app)?.executableURL ?? app.appendingPathComponent("Contents/MacOS/Moonlight")
 }
 
 func runningMoonlight() -> [NSRunningApplication] {
@@ -79,7 +92,10 @@ func moonlightIsStreaming(_ app: NSRunningApplication) -> Bool {
             ?? log.range(of: "Initializing video stream...", options: .backwards)
         let stop = log.range(of: "Stopping video stream...", options: .backwards)
             ?? log.range(of: "Cleaning up video stream...", options: .backwards)
-        if let start = start, stop == nil || start.lowerBound > stop!.lowerBound { return true }
+        if let start = start {
+            guard let stop = stop else { return true }
+            if start.lowerBound > stop.lowerBound { return true }
+        }
     }
     // When the stream state cannot be established, favor raising the existing
     // app rather than closing a window unnecessarily.
@@ -108,24 +124,33 @@ struct ResolutionChoice {
     let mode: CGDisplayMode
 }
 
+/// The refresh rate the menu offers: 120 Hz when the display has it, otherwise
+/// the highest rate among its 4K-class modes (for example 60 Hz on a plain 4K monitor).
+func streamRefreshRate(of modes: [CGDisplayMode]) -> Double {
+    if modes.contains(where: { abs($0.refreshRate - 120) < 1 }) { return 120 }
+    let fourK = modes.filter { $0.pixelWidth >= 3840 }
+    return (fourK.isEmpty ? modes : fourK).map { $0.refreshRate }.max() ?? 120
+}
+
 func resolutionChoices(for display: CGDirectDisplayID) -> [ResolutionChoice] {
     // Keep the built-in display untouched; MoonDock still launches normally.
     guard CGDisplayIsBuiltin(display) == 0 else { return [] }
     let modes = CGDisplayCopyAllDisplayModes(display,
         [kCGDisplayShowDuplicateLowResolutionModes as String: true] as CFDictionary) as? [CGDisplayMode] ?? []
-    let at120 = modes.filter { abs($0.refreshRate - 120) < 1 }
+    let rate = streamRefreshRate(of: modes)
+    let atRate = modes.filter { abs($0.refreshRate - rate) < 1 }
     var result: [ResolutionChoice] = []
-    if let standard = at120.first(where: { $0.width == 2560 && $0.height == 1440
+    if let standard = atRate.first(where: { $0.width == 2560 && $0.height == 1440
         && $0.pixelWidth == 5120 && $0.pixelHeight == 2880 }) {
         result.append(ResolutionChoice(key: "hidpi:2560x1440",
             title: L("Default – 2560 × 1440 (HiDPI)"), mode: standard))
     }
-    if let native = at120.first(where: { $0.width == 3840 && $0.height == 2160
+    if let native = atRate.first(where: { $0.width == 3840 && $0.height == 2160
         && $0.pixelWidth == 3840 && $0.pixelHeight == 2160 }) {
         result.append(ResolutionChoice(key: "native4k", title: L("Native 4K – 3840 × 2160"), mode: native))
     }
     for width in [1920, 2048, 2304, 3008, 3200, 3360] {
-        if let mode = at120.first(where: { $0.width == width && $0.height * 16 == width * 9
+        if let mode = atRate.first(where: { $0.width == width && $0.height * 16 == width * 9
             && $0.pixelWidth == width * 2 && $0.pixelHeight == $0.height * 2 }) {
             result.append(ResolutionChoice(key: "hidpi:\(mode.width)x\(mode.height)",
                 title: "\(mode.width) × \(mode.height) – HiDPI", mode: mode))
@@ -251,8 +276,19 @@ final class Launcher: NSObject, NSApplicationDelegate, NSMenuDelegate {
     var moonlightFocused = false
     var swallowTabUp = false
     var nextPermissionCheck = Date.distantPast
+    var streamingCached = false
+    var streamingRefreshing = false
+    var nextStreamingRefresh = Date.distantPast
+    var systemIsQuitting = false
+    var alertVisible = false
+    var attachedToRunningMoonlight = false
+    var loginItem: NSMenuItem?
 
     func message(_ title: String, _ text: String) {
+        // The timer runs in the common modes, so a second error must not stack another alert.
+        guard !alertVisible else { NSLog("MoonDock: %@ – %@", title, text); return }
+        alertVisible = true
+        defer { alertVisible = false }
         NSApp.activate(ignoringOtherApps: true)
         let alert = NSAlert()
         alert.messageText = title; alert.informativeText = text
@@ -260,14 +296,34 @@ final class Launcher: NSObject, NSApplicationDelegate, NSMenuDelegate {
         alert.runModal()
     }
 
+    /// Runs lsof and reads the Moonlight log off the main thread, then reports on the main thread.
+    func queryStreaming(_ completion: @escaping (Bool) -> Void) {
+        let apps = runningMoonlight()
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            let streaming = apps.contains(where: { moonlightIsStreaming($0) })
+            DispatchQueue.main.async {
+                self?.streamingCached = streaming
+                completion(streaming)
+            }
+        }
+    }
+
+    /// Refreshes the cached stream state in the background; the menu reads the cache.
+    func refreshStreamingState() {
+        guard !streamingRefreshing else { return }
+        guard !runningMoonlight().isEmpty else { streamingCached = false; return }
+        streamingRefreshing = true
+        queryStreaming { [weak self] _ in
+            self?.streamingRefreshing = false
+            self?.refreshWorkflowMenu()
+        }
+    }
+
     func applicationDidFinishLaunching(_ notification: Notification) {
         previousMacApp = NSWorkspace.shared.frontmostApplication
-        // Never reconfigure while Moonlight already owns a window or a stream.
-        if let existing = runningMoonlight().first {
-            existing.activate(options: [.activateAllWindows])
-            message(L("Moonlight is already running"), L("Quit Moonlight completely, then open MoonDock again. The display is not reconfigured during a running session."))
-            NSApp.terminate(nil); return
-        }
+        // Moonlight may already own a window or a stream. MoonDock then attaches to it:
+        // startup never changes the display, and nothing is launched or closed.
+        attachedToRunningMoonlight = !runningMoonlight().isEmpty
         do {
             let (id, before, _) = try displayPlan()
             initialMode = before
@@ -309,7 +365,8 @@ final class Launcher: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 let option = NSMenuItem(title: choice.title, action: #selector(selectResolution(_:)), keyEquivalent: "")
                 option.target = self
                 option.representedObject = choice.key
-                option.toolTip = String(format: L("120 Hz. Mac interface: %@; rendered internally: %@. The stream is disconnected before switching."),
+                option.toolTip = String(format: L("%@ Hz. Mac interface: %@; rendered internally: %@. The stream is disconnected before switching."),
+                    String(Int(choice.mode.refreshRate.rounded())),
                     "\(choice.mode.width) × \(choice.mode.height)", "\(choice.mode.pixelWidth) × \(choice.mode.pixelHeight)")
                 choicesMenu.addItem(option)
             }
@@ -323,6 +380,15 @@ final class Launcher: NSObject, NSApplicationDelegate, NSMenuDelegate {
         resolutionMenu = choicesMenu
         menu.addItem(resolutions)
         refreshResolutionMenu()
+        menu.addItem(.separator())
+        let login = NSMenuItem(title: L("Launch at Login"), action: #selector(toggleLoginItem), keyEquivalent: "")
+        login.target = self
+        loginItem = login
+        menu.addItem(login)
+        refreshLoginItem()
+        let about = NSMenuItem(title: L("About MoonDock"), action: #selector(showAbout), keyEquivalent: "")
+        about.target = self
+        menu.addItem(about)
         menu.addItem(.separator())
         let stop = NSMenuItem(title: L("Quit MoonDock"), action: #selector(stopMoonlight), keyEquivalent: "")
         stop.target = self
@@ -343,20 +409,29 @@ final class Launcher: NSObject, NSApplicationDelegate, NSMenuDelegate {
             name: endStreamNotification, object: nil)
         NSWorkspace.shared.notificationCenter.addObserver(self, selector: #selector(moonlightTerminated(_:)),
             name: NSWorkspace.didTerminateApplicationNotification, object: nil)
+        NSWorkspace.shared.notificationCenter.addObserver(self, selector: #selector(systemWillPowerOff(_:)),
+            name: NSWorkspace.willPowerOffNotification, object: nil)
         NSWorkspace.shared.notificationCenter.addObserver(self, selector: #selector(activeAppChanged(_:)),
             name: NSWorkspace.didActivateApplicationNotification, object: nil)
         moonlightFocused = NSWorkspace.shared.frontmostApplication?.bundleIdentifier == moonlightID
         registerReturnShortcut()
         installShortcutFilter()
-        timer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in self?.check() }
-        launching = true
+        // Common modes keep the timer running while an alert or the menu is open.
+        let tick = Timer(timeInterval: 0.5, repeats: true) { [weak self] _ in self?.check() }
+        RunLoop.main.add(tick, forMode: .common)
+        timer = tick
+        launching = !attachedToRunningMoonlight
+        if attachedToRunningMoonlight {
+            refreshStreamingState()
+            return
+        }
         // Start Moonlight after the launcher menu is ready; keep the current display mode.
         DispatchQueue.main.asyncAfter(deadline: .now() + 2) { [weak self] in
             guard let self = self, !self.finishing else { return }
             if let index = CommandLine.arguments.firstIndex(of: "--desktop"), index + 1 < CommandLine.arguments.count {
                 let host = CommandLine.arguments[index + 1]
                 let process = Process()
-                process.executableURL = URL(fileURLWithPath: "/Applications/Moonlight.app/Contents/MacOS/Moonlight")
+                process.executableURL = moonlightExecutableURL()
                 process.arguments = ["stream", host, "Desktop"]
                 process.standardOutput = FileHandle.nullDevice
                 process.standardError = FileHandle.nullDevice
@@ -370,7 +445,7 @@ final class Launcher: NSObject, NSApplicationDelegate, NSMenuDelegate {
             }
             let config = NSWorkspace.OpenConfiguration()
             config.activates = true
-            NSWorkspace.shared.openApplication(at: URL(fileURLWithPath: "/Applications/Moonlight.app"),
+            NSWorkspace.shared.openApplication(at: moonlightAppURL(),
                 configuration: config) { [weak self] app, error in
                 DispatchQueue.main.async {
                     guard let self = self else { return }
@@ -382,10 +457,6 @@ final class Launcher: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 }
             }
         }
-    }
-
-    @objc func showMoonlight() {
-        runningMoonlight().first?.activate(options: [.activateAllWindows])
     }
 
     func registerReturnShortcut() {
@@ -425,6 +496,7 @@ final class Launcher: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     @objc func activeAppChanged(_ notification: Notification) {
         moonlightFocused = (notification.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication)?.bundleIdentifier == moonlightID
+        updateShortcutTap()
     }
 
     @objc func requestShortcutPermission() {
@@ -442,7 +514,9 @@ final class Launcher: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 guard let userData = userData else { return Unmanaged.passUnretained(event) }
                 let owner = Unmanaged<Launcher>.fromOpaque(userData).takeUnretainedValue()
                 if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput {
-                    if let tap = owner.shortcutTap { CGEvent.tapEnable(tap: tap, enable: true) }
+                    if let tap = owner.shortcutTap {
+                        CGEvent.tapEnable(tap: tap, enable: owner.moonlightFocused || owner.swallowTabUp)
+                    }
                     return Unmanaged.passUnretained(event)
                 }
                 // Only inspect Tab and its modifier flags. No characters or input history
@@ -452,6 +526,7 @@ final class Launcher: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 }
                 if type == .keyUp && owner.swallowTabUp {
                     owner.swallowTabUp = false
+                    DispatchQueue.main.async { owner.updateShortcutTap() }
                     return nil
                 }
                 let flags = event.flags
@@ -469,18 +544,28 @@ final class Launcher: NSObject, NSApplicationDelegate, NSMenuDelegate {
         shortcutTapSource = CFMachPortCreateRunLoopSource(kCFAllocatorDefault, tap, 0)
         if let source = shortcutTapSource {
             CFRunLoopAddSource(CFRunLoopGetMain(), source, .commonModes)
-            CGEvent.tapEnable(tap: tap, enable: true)
             UserDefaults.standard.set(true, forKey: "shortcutFilterReady")
+            updateShortcutTap()
         }
+    }
+
+    /// The tap only sees keystrokes while Moonlight is in front (plus the Tab release
+    /// that still has to be swallowed after the shortcut hid Moonlight).
+    func updateShortcutTap() {
+        guard let tap = shortcutTap else { return }
+        CGEvent.tapEnable(tap: tap, enable: moonlightFocused || swallowTabUp)
     }
 
     func menuWillOpen(_ menu: NSMenu) {
         refreshResolutionMenu()
         refreshWorkflowMenu()
+        refreshLoginItem()
+        // lsof and the log read happen in the background; the menu updates when they finish.
+        refreshStreamingState()
     }
 
     func refreshWorkflowMenu() {
-        let streaming = runningMoonlight().contains(where: { moonlightIsStreaming($0) })
+        let streaming = streamingCached && !runningMoonlight().isEmpty
         let available = !returningToMain && !stopping && !finishing && !launching
         openMenuItem?.title = streaming ? L("Show Stream") : L("Open Moonlight")
         openMenuItem?.isEnabled = available
@@ -496,6 +581,29 @@ final class Launcher: NSObject, NSApplicationDelegate, NSMenuDelegate {
             option.state = sameMode(current, choice.mode) ? .on : .off
             option.isEnabled = !returningToMain && !stopping && !finishing
         }
+    }
+
+    func refreshLoginItem() {
+        loginItem?.state = SMAppService.mainApp.status == .enabled ? .on : .off
+    }
+
+    @objc func toggleLoginItem() {
+        let service = SMAppService.mainApp
+        do {
+            switch service.status {
+            case .enabled: try service.unregister()
+            case .requiresApproval: SMAppService.openSystemSettingsLoginItems()
+            default: try service.register()
+            }
+        } catch {
+            message(L("Launch at Login"), error.localizedDescription)
+        }
+        refreshLoginItem()
+    }
+
+    @objc func showAbout() {
+        NSApp.activate(ignoringOtherApps: true)
+        NSApp.orderFrontStandardAboutPanel(nil)
     }
 
     @objc func selectResolution(_ sender: NSMenuItem) {
@@ -515,7 +623,7 @@ final class Launcher: NSObject, NSApplicationDelegate, NSMenuDelegate {
         if sameMode(current, choice.mode) { refreshResolutionMenu(); return }
         pendingResolutionKey = key
         UserDefaults.standard.removeObject(forKey: "lastResolutionError")
-        prepareMainWindow()
+        prepareMainWindow(streaming: false)
         refreshResolutionMenu()
     }
 
@@ -558,22 +666,28 @@ final class Launcher: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     @objc func showMainWindow() {
         guard !finishing, !stopping, !returningToMain else { return }
-        if let stream = runningMoonlight().first(where: { moonlightIsStreaming($0) }) {
-            // Opening/showing is non-destructive. Disconnecting has its own action.
-            _ = stream.unhide()
-            stream.activate(options: [.activateAllWindows])
-            return
+        guard !runningMoonlight().isEmpty else { prepareMainWindow(streaming: false); return }
+        queryStreaming { [weak self] streaming in
+            guard let self = self, !self.finishing, !self.stopping, !self.returningToMain else { return }
+            if streaming, let stream = runningMoonlight().first {
+                // Opening/showing is non-destructive. Disconnecting has its own action.
+                _ = stream.unhide()
+                stream.activate(options: [.activateAllWindows])
+                return
+            }
+            self.prepareMainWindow(streaming: false)
         }
-        prepareMainWindow()
     }
 
     @objc func endCurrentStream() {
-        guard !finishing, !stopping, !returningToMain,
-              runningMoonlight().contains(where: { moonlightIsStreaming($0) }) else { return }
-        prepareMainWindow()
+        guard !finishing, !stopping, !returningToMain, !runningMoonlight().isEmpty else { return }
+        queryStreaming { [weak self] streaming in
+            guard let self = self, streaming, !self.finishing, !self.stopping, !self.returningToMain else { return }
+            self.prepareMainWindow(streaming: true)
+        }
     }
 
-    func prepareMainWindow() {
+    func prepareMainWindow(streaming: Bool) {
         guard !finishing, !stopping, !returningToMain else { return }
         returningToMain = true
         UserDefaults.standard.set(false, forKey: "mainWindowOpened")
@@ -582,7 +696,7 @@ final class Launcher: NSObject, NSApplicationDelegate, NSMenuDelegate {
             if pendingResolutionKey != nil { applyPendingResolution() } else { openMainWindow() }
             return
         }
-        if pendingResolutionKey == nil && !apps.contains(where: { moonlightIsStreaming($0) }) {
+        if pendingResolutionKey == nil && !streaming {
             // Reuse an already open main window, including a hidden or covered app.
             apps.forEach { _ = $0.unhide(); $0.activate(options: [.activateAllWindows]) }
             openMainWindow()
@@ -604,7 +718,7 @@ final class Launcher: NSObject, NSApplicationDelegate, NSMenuDelegate {
         config.activates = true
         // A fresh normal launch shows Moonlight's settings-capable main window,
         // including when this launcher originally started a stream via --desktop.
-        NSWorkspace.shared.openApplication(at: URL(fileURLWithPath: "/Applications/Moonlight.app"),
+        NSWorkspace.shared.openApplication(at: moonlightAppURL(),
             configuration: config) { [weak self] app, error in
             DispatchQueue.main.async {
                 guard let self = self else { return }
@@ -674,6 +788,10 @@ final class Launcher: NSObject, NSApplicationDelegate, NSMenuDelegate {
             nextPermissionCheck = Date().addingTimeInterval(5)
             installShortcutFilter()
         }
+        if Date() >= nextStreamingRefresh {
+            nextStreamingRefresh = Date().addingTimeInterval(2)
+            refreshStreamingState()
+        }
         if returningToMain {
             if runningMoonlight().isEmpty && !resolutionApplying {
                 if pendingResolutionKey != nil { applyPendingResolution() }
@@ -690,6 +808,11 @@ final class Launcher: NSObject, NSApplicationDelegate, NSMenuDelegate {
     func finish() {
         guard !finishing, runningMoonlight().isEmpty else { return }
         finishing = true; timer?.invalidate()
+        restoreDisplayIfNeeded()
+        NSApp.terminate(nil)
+    }
+
+    func restoreDisplayIfNeeded() {
         // Only undo changes made through this launcher's resolution menu.
         if didChangeResolution, let id = display, CGDisplayIsOnline(id) != 0,
            let before = initialMode, let saved = displayUUID,
@@ -700,10 +823,27 @@ final class Launcher: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 catch { message(L("Restore Display"), L("macOS will restore the temporary resolution when MoonDock quits.") + "\n\n" + error.localizedDescription) }
             }
         }
-        NSApp.terminate(nil)
+        didChangeResolution = false
     }
 
+    /// True when macOS itself asks apps to quit for log out, restart or shut down.
+    func quitComesFromSystem() -> Bool {
+        if systemIsQuitting { return true }
+        guard let reason = NSAppleEventManager.shared().currentAppleEvent?
+            .attributeDescriptor(forKeyword: AEKeyword(kAEQuitReason)) else { return false }
+        return [OSType(kAEShutDown), OSType(kAERestart), OSType(kAEReallyLogOut), OSType(kAELogOut)]
+            .contains(reason.enumCodeValue)
+    }
+
+    @objc func systemWillPowerOff(_ notification: Notification) { systemIsQuitting = true }
+
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        // Never block a log out or shutdown: leave Moonlight to macOS and quit.
+        if quitComesFromSystem() {
+            // The display change is app-only: macOS reverts it when this process exits,
+            // so no restore (and no possible alert) may hold up the log out.
+            return .terminateNow
+        }
         if !runningMoonlight().isEmpty && display != nil && !finishing {
             stopMoonlight(); return .terminateCancel
         }

@@ -1,6 +1,6 @@
 /* English base strings. Keys equal values; see Sources/MoonDock.swift. */
 
-"120 Hz. Mac interface: %@; rendered internally: %@. The stream is disconnected before switching." = "120 Hz. Mac interface: %@; rendered internally: %@. The stream is disconnected before switching.";
+"%@ Hz. Mac interface: %@; rendered internally: %@. The stream is disconnected before switching." = "%@ Hz. Mac interface: %@; rendered internally: %@. The stream is disconnected before switching.";
 "Close Moonlight and MoonDock and restore a Mac resolution changed in this menu." = "Close Moonlight and MoonDock and restore a Mac resolution changed in this menu.";
 "Default – 2560 × 1440 (HiDPI)" = "Default – 2560 × 1440 (HiDPI)";
 "Disconnect the stream and open the main window. MoonDock and the current Mac resolution stay as they are." = "Disconnect the stream and open the main window. MoonDock and the current Mac resolution stay as they are.";
@@ -10,12 +10,12 @@
 "MoonDock – a manually selected resolution is restored on quit" = "MoonDock – a manually selected resolution is restored on quit";
 "Moonlight Main Window" = "Moonlight Main Window";
 "Moonlight could not be opened" = "Moonlight could not be opened";
-"Moonlight is already running" = "Moonlight is already running";
 "Native 4K – 3840 × 2160" = "Native 4K – 3840 × 2160";
+"Launch at Login" = "Launch at Login";
+"About MoonDock" = "About MoonDock";
 "No supported external display modes" = "No supported external display modes";
 "Open Moonlight" = "Open Moonlight";
 "Quit MoonDock" = "Quit MoonDock";
-"Quit Moonlight completely, then open MoonDock again. The display is not reconfigured during a running session." = "Quit Moonlight completely, then open MoonDock again. The display is not reconfigured during a running session.";
 "Restore Display" = "Restore Display";
 "Return to Mac" = "Return to Mac";
 "Show Stream" = "Show Stream";

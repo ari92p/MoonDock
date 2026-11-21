@@ -10,18 +10,19 @@ The interface is available in English and German and follows the macOS system la
 
 - **Open Moonlight / Show Stream**. Opens or raises Moonlight's main window. During a stream it raises the stream instead, without disconnecting.
 - **End Stream**. Enabled only while a stream is running. It closes the local stream and reopens Moonlight's main window.
-- **Mac Resolution**. Lists 120-Hz modes of the main display: 2560 × 1440 HiDPI, native 3840 × 2160, and several 16:9 HiDPI scales. The current mode is checked. Moonlight is closed before the mode changes and reopened afterwards.
+- **Mac Resolution**. Lists the 120-Hz modes (or the highest rate the display offers at 4K) of the main display: 2560 × 1440 HiDPI, native 3840 × 2160, and several 16:9 HiDPI scales. The current mode is checked. Moonlight is closed before the mode changes and reopened afterwards.
+- **Launch at Login** and **About MoonDock**. The first toggles starting MoonDock at login (the app should be installed in `/Applications`).
 - **Quit MoonDock**. Closes Moonlight and MoonDock and restores the display mode that was active when MoonDock started, but only if you changed it from the menu.
 - **⌥⌘Tab** hides Moonlight and returns to the previously active Mac app, even while a stream captures the keyboard.
 
-Closing Moonlight itself (window close button or ⌘Q) leaves MoonDock in the menu bar, so you can reopen Moonlight from there. Starting MoonDock never changes the display mode. Display changes are made with `kCGConfigureForAppOnly`, so macOS reverts them if MoonDock crashes.
+Closing Moonlight itself (window close button or ⌘Q) leaves MoonDock in the menu bar, so you can reopen Moonlight from there. Starting MoonDock never changes the display mode. If Moonlight is already running, MoonDock attaches to it instead of launching or closing anything. Quitting MoonDock during log out or shutdown is never blocked. Display changes are made with `kCGConfigureForAppOnly`, so macOS reverts them if MoonDock crashes.
 
 ## Requirements
 
 - macOS 13 or later (developed and tested on Apple Silicon).
 - Xcode Command Line Tools (`xcode-select --install`) for building.
-- Moonlight installed at `/Applications/Moonlight.app`.
-- For the resolution menu: an external main display with 4K modes at 120 Hz. Without one, MoonDock still works, and the menu shows no modes. The built-in MacBook display is never reconfigured.
+- Moonlight installed (found by its bundle identifier, so `/Applications` and `~/Applications` both work).
+- For the resolution menu: an external main display with 4K modes (120 Hz preferred; otherwise the highest rate of its 4K modes). Without one, MoonDock still works, and the menu shows no modes. The built-in MacBook display is never reconfigured.
 
 ## Build and install
 
@@ -31,7 +32,7 @@ Closing Moonlight itself (window close button or ⌘Q) leaves MoonDock in the me
 open /Applications/MoonDock.app
 ```
 
-`build.sh` compiles the app into a temporary directory, renders the icon, and writes `build/MoonDock.zip`. Quit MoonDock before running `install.sh` again for an update.
+`build.sh` compiles the app to `build/MoonDock.app`, renders the icon, and writes `build/MoonDock.zip`. The build number is the Git commit count plus a fixed offset. `scripts/check-strings.sh` verifies that all UI strings have translations; GitHub Actions runs it and the build on every push. Quit MoonDock before running `install.sh` again for an update.
 
 ### Code signing
 
@@ -54,7 +55,7 @@ To start a desktop stream directly instead of the main window:
 
 ## Permissions
 
-The ⌥⌘Tab shortcut needs **System Settings → Privacy & Security → Accessibility → MoonDock**. MoonDock uses this permission to watch for the Tab key while Moonlight is in front. Other keys are passed through untouched, and nothing is recorded or logged. With an ad-hoc signed build you need to turn the permission off and on again after each update; see [Code signing](#code-signing).
+The ⌥⌘Tab shortcut needs **System Settings → Privacy & Security → Accessibility → MoonDock**. MoonDock uses this permission to watch for the Tab key, and only while Moonlight is in front; the keyboard tap is switched off otherwise. Other keys are passed through untouched, and nothing is recorded or logged. With an ad-hoc signed build you need to turn the permission off and on again after each update; see [Code signing](#code-signing).
 
 ## Translations
 
@@ -67,7 +68,7 @@ UI strings use their English text as the key, wrapped in `L("…")` in `Sources/
 ## How it works and limits
 
 - MoonDock detects an active stream by inspecting Moonlight's UDP sockets and its log file. Moonlight has no public control API, so future Moonlight versions may need adjustments. If the state is unclear, MoonDock raises the existing window rather than closing anything.
-- The offered resolutions are tuned for a 4K/120-Hz monitor and are hard-coded in `resolutionChoices(for:)`. Other monitors may show fewer or no modes.
+- The offered resolutions are tuned for a 4K monitor and are hard-coded in `resolutionChoices(for:)`. Other monitors may show fewer or no modes.
 - Display changes happen only after the Moonlight process has exited, with a short settling delay.
 - The bundle identifier `de.mlemors.Moonlight4K` comes from the project's earlier name and is kept so existing Accessibility permissions keep working.
 
